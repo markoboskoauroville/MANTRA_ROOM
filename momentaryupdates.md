@@ -270,11 +270,11 @@ Reading (master): each block is 3 s fade-in, 5 s fully visible, 3 s controlled f
 
 Reading (worker): a viewer on the VM (own Chrome, own PulseAudio sink) measures the page's sound for drops, logged with times; `mrlinux poster on|off` = every 2 min of music and visuals, the 21.11.2026 concert poster full frame for 1 min in silence (music fades 1 s out and in, the track pauses), then on again. The 11:58:30 hand-over stays.
 
-## Request 46 (15.11.2026): the VM stream's visuals change, as on the desktop and the phone
+## Request 50 (15.11.2026): the VM stream's visuals change, as on the desktop and the phone
 
 > Please, on the Internet, our Mantle room in virtual machine is playing always the same visuals. It needs to act the same as desktop app and the same as my phone app. It needs to change the visuals and have text, everything the same. It's stuck in one view. What is this? It's not the same app.
 
-## Request 47 (15.11.2026, ~midday): a different visualization every thirty seconds
+## Request 51 (15.11.2026, ~midday): a different visualization every thirty seconds
 
 > Fix now, in meditation room on the virtual machine. Let it, just every, thirty seconds show different visualization.
 
