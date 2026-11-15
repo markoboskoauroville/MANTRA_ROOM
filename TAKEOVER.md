@@ -246,5 +246,14 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
   Tags are **mac-vN, not Latest**: the Android vN releases own releases/latest, which the site's buttons and the phone
   app open. The updater (kits/mac-updater, `tagPrefix = "mac-v"`) looks for the newest mac-v tag.
 - **Install**: `gh release download mac-vN --pattern app.zip`, ditto into /Applications, `codesign --force -s "Mantra Apps"`.
-- **Stands (15.11.2026)**: v1 green first run (43681445210), installed, visual 60 fps; first job: the test stream until
-  11:55 into BlackHole 2ch (Sound Link → Pixel → camera on the keyboard).
+- **v2 (15.11.2026, Request 35 "both, pattern and meditation")**: G815 Lights v35 has the frame API (port 8877, stream
+  8878, MANTRA_MANIFEST keyboard-lights.md). The app now reads GET /layout once and streams 'R' frames (115 x RGB in
+  layout order); the frame comes as 48 x 15 (2 px per key unit) and each key is the average under it. Every frame
+  carries the liveness counter (F1-F6 binary seconds yellow/dim red, F7-F12 dark, ESC green/red; the same as G815
+  Lights' Shows.counter). Lights mode meditation | patterns | both (default both: every 5 min one of the ten patterns
+  for 20 s via POST /show/<name> {seconds 20, counter, ttl 20}, frames paused meanwhile; patterns = show `all`). Door:
+  `lights {on, mode}`, play-loop `lights_mode`; start option `--lights-mode`. The direct `g815 serve` way stays as the
+  fallback when G815 Lights does not answer.
+- **Stands (15.11.2026)**: v1 (run 43681445210) and v2 (run 43681879207) green on the first run, v2 installed, visual
+  60 fps, G815 Lights /status mode stream at about 20 fps. Test stream until 11:55 into BlackHole 2ch (Sound Link →
+  Pixel → camera on the keyboard), -5 dB gain.
