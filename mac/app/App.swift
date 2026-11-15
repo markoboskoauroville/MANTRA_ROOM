@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 12
+let VERSION = 13
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {
@@ -251,6 +251,10 @@ struct Root: View {
                         Text(String(format: "%+.0f dB", player.gainDb)).fixedSize()
                         Text("+").word("Gain up", id: "gain-up") { player.setGain(player.gainDb + 1) }
                     }
+                }
+                Cell(label: "DUCK") {
+                    Text(player.duckOn ? (player.ducking ? "ON · DUCKING" : "ON") : "OFF").fixedSize().foregroundStyle(player.duckOn ? Ink.green : Ink.grey)
+                        .word("Duck under the voice", id: "duck", value: player.duckOn ? "on" : "off") { player.setDuck(!player.duckOn) }
                 }
                 Cell(label: "PEAK") { Text(player.peakDb > -100 ? String(format: "%.1f dBFS", player.peakDb) : "—").fixedSize() }
                 Cell(label: "STOPS AT") {

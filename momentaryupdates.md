@@ -243,3 +243,11 @@ Reading (master): measured with 12 window frames at 100 ms: NDI off = steady bri
 > the same principle we can use before we start to stream the concert: this visualization and this music can run, and then the text can say, "I don't know, 10 minutes until the live stream," and then 20 minutes, and then it dissolves. It can also teach people about Sanskrit mantras, everything that's on the website. We can summarize and just slowly, spoon by spoon, feed the audience who are watching our visualization. The text is coming from time to time
 
 Reading (master): butterchurn's own launchSongTitleAnim draws the text INTO the feedback frame so the preset melts it; web/textfx.js (portable, shared with the Linux VM version) wraps it, adds the PRE-SHOW countdown (20/10/5/1 minutes) and teaching cards (preshow/cards.json, 31 cards), local API /api/text, toggles TEXT and PRE-SHOW. Track-start titles and the guide's spoken lines (timed with Whisper through MANTRA_VOICE /hear). The six voice tracks are toning (sung vowels), Whisper hears nothing real in them, so only the guide has lines.
+
+## Request 47 (15.11.2026): ducking, relative to the GAIN
+
+> no audio ducking. Don't add, please
+
+> You can add it, but don't bring it back to zero. If gain is minus 30, then you duck even more
+
+Reading (master): the second line stands. While MANTRA_VOICE says `on` + `phase: playing` (GET :8837/speaking, polled every 250 ms; no new endpoint was needed), every output and the NDI sound sit 12 dB below the GAIN he set (gain -30 gives -42), 300 ms down, 1 s back up to exactly his GAIN, which is never changed. DUCK toggle (AX), default on, saved. Mac v13.

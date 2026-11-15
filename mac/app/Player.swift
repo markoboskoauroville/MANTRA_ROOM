@@ -175,6 +175,16 @@ final class Player: ObservableObject {
     @Published var until: Date? = nil
     @Published var note = ""
     @Published var styleLock: String = UserDefaults.standard.string(forKey: "styleLock") ?? ""   // "" = both styles in the loop
+    // DUCK (Marko, 15.11.2026: "You can add it, but don't bring it back to zero. If gain is minus 30, then you duck even more"):
+    // while the voice (MANTRA_VOICE, GET :8837/speaking) is playing, the sound sits 12 dB BELOW the GAIN he set, never at
+    // zero and never changing the GAIN value: 300 ms down, 1 s back up to exactly his GAIN.
+    @Published var duckOn: Bool = UserDefaults.standard.object(forKey: "duckOn") as? Bool ?? true
+    @Published var ducking = false                // the voice is speaking and the sound is (going) down
+    private var duckNow = 0.0                     // dB below the GAIN right now (0 ... -12)
+    private var voiceSpeaking = false
+    private var duckTimer: Timer? = nil
+    static let duckDepth = -12.0
+    private var effectiveDb: Double { gainDb + duckNow }
     @Published var played = 0                     // tracks started since launch (evidence of the loop)
 
     /// the first ticked device (the one the picture and the position are read from)
@@ -198,8 +208,42 @@ final class Player: ObservableObject {
         for n in names { if let x = Devices.find(n), !devs.contains(x) { devs.append(x) } }
         if devs.isEmpty, let def = Devices.defaultOutput() { devs = [def] }
         build(devs)
+        startDuckWatch()
         clock = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in self?.everyQuarter() }
         RunLoop.main.add(clock!, forMode: .common)
+    }
+
+    // ---------------------------------------------------------------- ducking under the voice
+    func setDuck(_ on: Bool) { duckOn = on; UserDefaults.standard.set(on, forKey: "duckOn"); rampDuck() }
+    private func startDuckWatch() {
+        let t = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        t.schedule(deadline: .now() + 1, repeating: .milliseconds(250))
+        t.setEventHandler { [weak self] in
+            var req = URLRequest(url: URL(string: "http://127.0.0.1:8837/speaking")!); req.timeoutInterval = 0.5
+            URLSession.shared.dataTask(with: req) { data, _, _ in
+                var on = false
+                if let d = data, let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+                    on = (j["on"] as? Bool ?? false) && (j["phase"] as? String) == "playing" && !(j["paused"] as? Bool ?? false)
+                }
+                DispatchQueue.main.async { self?.voiceSpeaking = on; self?.rampDuck() }
+            }.resume()
+        }
+        t.resume(); duckWatch = t
+    }
+    private var duckWatch: DispatchSourceTimer?
+    private func rampDuck() {
+        let target = (duckOn && voiceSpeaking) ? Player.duckDepth : 0
+        ducking = target < 0
+        guard duckTimer == nil, abs(duckNow - target) > 0.01 else { return }
+        duckTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] tm in
+            guard let s = self else { tm.invalidate(); return }
+            let tgt = (s.duckOn && s.voiceSpeaking) ? Player.duckDepth : 0
+            let step = tgt < s.duckNow ? (12.0 / 0.3) * 0.03 : (12.0 / 1.0) * 0.03     // down in 300 ms, up in 1 s
+            if s.duckNow > tgt { s.duckNow = max(tgt, s.duckNow - step) } else { s.duckNow = min(tgt, s.duckNow + step) }
+            for l in s.lanes { l.setGain(s.effectiveDb) }
+            if abs(s.duckNow - tgt) < 0.001 { s.duckNow = tgt; tm.invalidate(); s.duckTimer = nil }
+        }
+        RunLoop.main.add(duckTimer!, forMode: .common)
     }
 
     // ---------------------------------------------------------------- the output devices
@@ -209,7 +253,7 @@ final class Player: ObservableObject {
         observers = []
         if let old = lanes.first { old.engine.mainMixerNode.removeTap(onBus: 0) }
         for l in lanes { l.halt() }
-        lanes = devs.map { Lane($0, gainDb: gainDb) }
+        lanes = devs.map { Lane($0, gainDb: effectiveDb) }
         outputs = devs
         if let main = lanes.first {
             main.engine.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in self?.take(buf) }
@@ -243,7 +287,7 @@ final class Player: ObservableObject {
     func setGain(_ db: Double) {
         gainDb = max(-30, min(6, db))
         UserDefaults.standard.set(gainDb, forKey: "gainDb")
-        for l in lanes { l.setGain(gainDb) }
+        for l in lanes { l.setGain(effectiveDb) }
     }
     private func recover() {
         // a device changed under an engine (a sample rate, BlackHole reset): the same devices and place again
