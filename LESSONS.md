@@ -108,3 +108,19 @@
   fade + blur melt) that drawtext cannot, and costs only the text's rectangle.
 - A load-average gate for a night job measures the job itself (Chrome's threads): gate on the real streams instead.
 - AAC in the stream for iPhone HLS means no sound for MediaMTX WebRTC (WHEP) readers; fine since the site plays HLS only.
+
+## 15.11.2026, render-ahead buffer (linux/mrbuffer.py)
+- ffmpeg's `-progress` `speed=` is the AVERAGE since the start, not the speed now: a hog that halves the encoder moves it
+  from 1.04x to 0.95x. For "now", take the change of out_time over the change of wall time (or watch the buffer seconds).
+- Across systemd services only CPUWeight splits the CPU (cgroup v2); Nice counts only inside one unit. A test hog started
+  with `systemd-run` (weight 100) competes with every service, including other sessions' tests: announce load tests and
+  never run them while anything public or another worker's test runs (`systemctl list-units --state=running`, `top`).
+- A public "test" show can start outside the announced windows (cloud-mixer-replay2 at 13:49:53): check the relay path
+  and the running units right before every soak, and keep a guard that aborts the soak when the public path goes live.
+- MPEG-TS from ffmpeg's segment muxer: video starts at pts 1.4065 s, Opus at 1.4 s (pre-skip); csv start = video pts - 1.4.
+  Joining segments of different runs needs PTS/DTS/PCR rewritten (~60 lines of Python), then `ffmpeg -c copy` to SRT
+  accepts it as one stream. The 33-bit PTS wraps: add modulo 2^33.
+- drawtext `%{pts\:localtime\:<epoch>\:%T}` draws the playout time of a frame rendered ahead (%T has no colon to escape).
+- The Mac's Homebrew ffmpeg 9 has no drawtext: picture tests run on the VM.
+- A mrlinux hook default must not override a later change in the main file (my getattr default 0.25 replaced vmclaude's
+  MRL_LEAD 1.0 until fixed): defaults come from the main file's own variable.

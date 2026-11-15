@@ -386,3 +386,12 @@ The VM cannot draw MilkDrop live, so the presets are drawn OFFLINE into clips an
   Spiral; 148 MB over the SIM, under Marko's 200 MB line), the rest by the night job.
 - Private test: `bash linux/vistest.sh [secs] [HH:MM]` (encoder from the checkout -> own MediaMTX path vistest, SRT :8993,
   HLS :8989, API :9994; Nice 19, CPUWeight 20), records, report + a frame every 2 s in ~/mrvistest.
+- **Soak 15.11.2026 15:50 (private path buftest, installed code, production unit properties), STOPPED EARLY at 262 s** on
+  the coordinator's order (the hog starved another worker's private test that ran at the same time). Before the hog the
+  encoder rendered at 1.04-1.2x and held 22-26 s; stress-ng --cpu 2 (system job, weight 100) from +120 s, plus the other
+  test, brought it to about 0.85x real speed: the buffer fell 24 s -> 3.3 s in 140 s, 4 low warnings, **0 fillers, 0
+  downstream restarts** when it was stopped (the hog still had 40 s to go, so it would probably have run dry for a few
+  seconds). NOT yet proven: a full 10-minute soak on a quiet VM, the recording's gap/silence analysis
+  (~/mrbuftest/soak/rec.ts on the VM, 4.4 min, kept), and whether CPUWeight 400 is enough. Not switched on in production
+  (`mrbuffer status` = direct). Earlier 100 s functional test (10:42, capped at 90 % of one core): ran dry by design,
+  fillers joined with no audio gap > 60 ms, the clock showed the playout time.
