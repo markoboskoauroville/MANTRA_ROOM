@@ -27,6 +27,8 @@ cat > "$APP/Contents/Info.plist" <<PL
 <key>CFBundleVersion</key><string>$V</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
+<key>NSLocalNetworkUsageDescription</key><string>Meditation Room (Mantra) sends its picture and sound as an NDI source on your network.</string>
+<key>NSBonjourServices</key><array><string>_ndi._tcp</string></array>
 <key>LSApplicationCategoryType</key><string>public.app-category.healthcare-fitness</string>
 </dict></plist>
 PL

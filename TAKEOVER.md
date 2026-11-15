@@ -269,3 +269,4 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
 - **Mac v6**: immersive view (Request 40): Immersive.swift-in-App: native full screen of the window, Root hides TopRow and controls, Esc monitor, cursor hides every 2 s; AX button immersive.
 - Mac v6 note: v3 to v5 were built with VERSION still 3 (BSD sed -i without the empty suffix did nothing) and overwrote the mac-v3 asset; fixed in v6, mac-v3 release deleted. Lesson: grep the VERSION line after bumping it.
 - **Mac v7**: OUTPUTS hides the system's private aggregates (CADefaultDeviceAggregate...).
+- **Mac v8**: NDI output (Request 42), Ndi.swift: runtime by dlopen, full NDI BGRA 1280 px snapshots of the visual at up to 25 fps + planar float audio of the first output; NDI word in the title row (AX "ndi"), saved, --ndi, door action ndi. NOT HX: HX send needs the NDI Advanced SDK for macOS, we hold only the Android one.

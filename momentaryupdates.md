@@ -207,3 +207,9 @@ Reading (master): an icon in the title row (AX button "Immersive view") puts the
 ## Request 41 (15.11.2026): private aggregate devices must not be listed
 
 Reading (master): "CADefaultDeviceAggregate-..." is a private aggregate the system makes for our own process; it must not appear in OUTPUTS. Filtered by name and by aggregate transport type. Mac v7.
+
+## Request 42 (15.11.2026): NDI HX output
+
+> please also update my app Meditation Room to have NDI HX output
+
+Reading (master): the Mac app sends its picture and its sound as an NDI source "Meditation Room (Mantra)" (OBS, vMix, Sound Link studio.py receive it); an NDI word in the title row (AX) toggles it, saved, flag --ndi. Real HX (H.264/HEVC) sending needs the NDI Advanced SDK for macOS, which we do not have (the Advanced SDK we hold is Android only); the installed runtime sends full NDI (SpeedHQ). Shipped as full NDI, not pretended as HX. Mac v8.

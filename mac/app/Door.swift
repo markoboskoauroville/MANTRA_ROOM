@@ -29,6 +29,7 @@ final class Door {
         ["name": "output", "does": "plays into this device from now on (the Mac's default output is not changed)", "args": ["name": "string"]],
         ["name": "outputs-on", "does": "plays on all these devices together", "args": ["names": "[string]"]],
         ["name": "outputs", "does": "the devices that can play sound", "args": [:]],
+        ["name": "ndi", "does": "the picture and the sound as the NDI source Meditation Room (Mantra) (full NDI, not HX)", "args": ["on": "bool"]],
         ["name": "gain", "does": "the output gain in dB (-30 ... +6)", "args": ["db": "number"]],
         ["name": "style", "does": "the visual style: next, prev or a number", "args": ["to": "next | prev | int"]],
         ["name": "status", "does": "what plays, where, the level, the lights", "args": [:]],
@@ -103,7 +104,7 @@ final class Door {
             "lights": ["on": l.on, "mode": l.mode, "pattern": l.pattern, "way": l.way, "frames": l.sent, "fps": (l.fps * 10).rounded() / 10, "error": l.error],
             "visual": ["style": viz?.styleName ?? "", "auto": viz?.auto ?? true, "fps": ((viz?.fps ?? 0) * 10).rounded() / 10],
             "note": p.note, "songs_missing": Songs.missing.map(\.file),
-            "title_hidden": App.shared.window?.titleVisibility == .hidden,
+            "ndi": NDISender.shared.on, "title_hidden": App.shared.window?.titleVisibility == .hidden,
             "window": NSApp.windows.first(where: { $0.title == APP_NAME })?.windowNumber ?? 0,
         ]
         if let u = p.until {
@@ -152,6 +153,8 @@ final class Door {
             guard let os = a["names"] as? [String] else { return ["ok": false, "error": "names: [device names]"] }
             p.setOutputs(os.compactMap { Devices.find($0) }); return ["ok": true, "result": state()]
         case "outputs": return ["ok": true, "result": Devices.outputs().map(\.name)]
+        case "ndi":
+            NDISender.shared.set(a["on"] as? Bool ?? true); return ["ok": true, "result": state()]
         case "gain":
             guard let g = a["db"] as? Double else { return ["ok": false, "error": "db is a number"] }
             p.setGain(g); return ["ok": true, "result": state()]

@@ -356,6 +356,7 @@ final class Player: ObservableObject {
         guard let ch = buf.floatChannelData else { return }
         let n = Int(buf.frameLength), c = Int(buf.format.channelCount)
         guard n > 0 else { return }
+        NDISender.shared.audio(buf)
         let l = ch[0], r = c > 1 ? ch[1] : ch[0]
         var pk: Float = 0
         lock.lock()

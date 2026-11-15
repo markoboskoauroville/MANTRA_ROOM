@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 7
+let VERSION = 8
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {
@@ -111,6 +111,7 @@ func clock(_ s: Double) -> String { let t = max(0, Int(s)); return "\(t / 60):" 
 // ---------------------------------------------------------------- the window
 struct TopRow: View {
     @AppStorage("onTop") private var onTop = false
+    @ObservedObject var ndi = NDISender.shared
     var body: some View {
         ZStack {
             (Text("Meditation Room").fontWeight(.bold) + Text(" (Mantra)").fontWeight(.regular))
@@ -121,6 +122,8 @@ struct TopRow: View {
                 Text("OFF").foregroundStyle(Ink.grey).word("Off", id: "off") { DispatchQueue.main.async { NSApp.terminate(nil) } }
                 Spacer()
                 Text("v\(VERSION)").foregroundStyle(Ink.dim)
+                Text("NDI").foregroundStyle(ndi.on ? Ink.green : Ink.grey)
+                    .word("NDI output", id: "ndi", value: ndi.on ? "on" : "off") { ndi.set(!ndi.on) }
                 Text("TOP").foregroundStyle(onTop ? Ink.green : Ink.grey)
                     .word("Top", id: "top", value: onTop ? "on" : "off") { onTop.toggle(); TopRow.float(onTop) }
                 Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Ink.grey)
@@ -313,6 +316,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         viz.player = player; viz.lights = lights
         Door.shared.player = player; Door.shared.lights = lights; Door.shared.viz = viz
         Door.shared.start()
+        NDISender.shared.viz = viz
         makeWindow()
         // the visual keeps running and the stream keeps going with the window behind others (no App Nap)
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
@@ -335,6 +339,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if a.contains("--lights") { lights.set(true) }
         if a.contains("--no-lights") { lights.set(false) }
         if let m = val("--lights-mode") { lights.setMode(m) }
+        if a.contains("--ndi") || NDISender.wantsOn { NDISender.shared.set(true) }
         if a.contains("--play-loop") { player.play(val("--from").flatMap(Int.init).map { $0 - 1 } ?? 0) }
     }
 
