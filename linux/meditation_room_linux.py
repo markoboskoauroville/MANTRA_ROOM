@@ -24,6 +24,7 @@ import audioop  # noqa: E402 (Python 3.12: still there; the gain of the poster f
 import datetime as dt
 import json
 import os
+import re
 import signal
 import ssl
 import subprocess
@@ -136,6 +137,10 @@ def graph(pc=None):
     if VIS[0]:   # the clip library's frames (input 1, already 1280x720 with the text block drawn in) replace the mandala
         out = out.replace("[bg][scope]blend=all_mode=screen:shortest=1,format=yuv420p,scale=1280:720:flags=bicubic,",
                           "[1:v]setpts=N/(25*TB),format=yuv420p,").replace(card("block.txt", f, 48, 0), "")
+        if os.environ.get("MRL_LOOK", "swift") == "swift":
+            # the Swift app's picture (its NDI/stream frame) is the visual and the melting text only: no title, clock or track
+            # label in the picture (Marko, 15.11.2026: "looks exactly like Swift app"). MRL_LOOK=labels brings them back.
+            out = re.sub(r"drawtext=[^,]*?(?:title\.txt|now\.txt|localtime)[^,]*,", "", out)
         g = f"[0:a]anull[aout];{out}"
     if pc and not VIS[0]:   # the poster over everything for `for` s of every cycle; one decoded frame, looped (with the clip
         # library the player fades it in and out over the visuals itself, mrvisuals.Visuals.poster)

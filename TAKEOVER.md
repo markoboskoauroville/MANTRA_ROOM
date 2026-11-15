@@ -401,3 +401,10 @@ The VM cannot draw MilkDrop live, so the presets are drawn OFFLINE into clips an
   MRV_LUMA_DROP 0.65 (mostly white, greys out when darkened) is left out. 15.11.2026: Stained glass 0.83 left out; Spiral
   0.47, Castle 0.46, Mandala 0.42, Lotus 0.40 graded; Angel flight 0.03 (very dark, kept). The text block has a soft dark
   halo (the letters widened 15 px, blurred 18 px, black at MRV_HALO 0.55) so it reads on bright frames.
+- **Swift look** (Marko, 15.11.2026: "looks exactly like Swift app with its visualizations which are changing"): compared with
+  Mac v19's picture (window captured off-focus, 15.11.2026): the Swift picture is the visual + the melting text only. So in
+  library mode the Linux picture drops the title, clock and track label (MRL_LOOK=swift, default; `labels` brings them back),
+  the clips follow the Swift app's order (its twelve calm presets, then the other presets by name, then the ffmpeg styles;
+  MRV_ORDER=random for a shuffle) and blend over 6 s like its Auto (MRV_XFADE), every 30 s (MRV_SWITCH, Marko's request;
+  the Swift app's Auto is 40 s). Kept different on purpose: the brightness grade and the text halo (review), and the
+  pre-show wording "Concert live at HH:MM" (the Swift app says "N minutes to live").

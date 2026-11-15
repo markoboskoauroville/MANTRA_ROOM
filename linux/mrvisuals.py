@@ -50,7 +50,11 @@ AUDIO = os.environ.get("MRL_AUDIO", REPO + "/android/app/src/main/assets/web/aud
 MIN_MILK = int(os.environ.get("MRV_MIN_MILK", "24"))   # below this many MilkDrop clips the ffmpeg styles are mixed in
 W, H, FPS = 1280, 720, 25
 FRAME = W * H * 3 // 2
-XF = int(float(os.environ.get("MRV_XFADE", "1.0")) * FPS)   # cross-fade frames
+# the Swift app blends one preset into the next over 6 s (mac/web/index.html: Auto, load(ix + 1, 6))
+XF = int(float(os.environ.get("MRV_XFADE", "6.0")) * FPS)   # cross-fade frames
+# "desktop": the Swift app's order (its twelve calm presets, then the rest of butterchurn's list, each next one in turn), the
+# ffmpeg styles after them; "random": a shuffle. Either way no clip again until all have played.
+ORDER = os.environ.get("MRV_ORDER", "desktop")
 # Marko, 15.11.2026: "Let it, just every, thirty seconds show different visualization." Each clip plays a random stretch of
 # SWITCH seconds (the whole clip if shorter), then the next one; 0 = whole clips.
 SWITCH = float(os.environ.get("MRV_SWITCH", "30"))
@@ -115,6 +119,19 @@ class Bag:
             clips = playable(self.lib)
             if not clips:
                 return None
+            if ORDER == "desktop":
+                clips.sort(key=desktop_rank, reverse=True)       # pop() takes from the end: the first in order
+                if self.last:                                    # go on after the clip shown last, as the app's ix + 1
+                    ranks = [desktop_rank(c) for c in clips]
+                    lr = next((desktop_rank(c) for c in library(self.lib) if c["path"] == self.last), None)
+                    if lr is not None:
+                        later = [c for c, r in zip(clips, ranks) if r > lr]
+                        earlier = [c for c, r in zip(clips, ranks) if r <= lr]
+                        clips = earlier + later                  # later ones are popped first
+                self.bag = clips
+                c = self.bag.pop()
+                self.last = c["path"]
+                return c
             random.shuffle(clips)
             if len(clips) > 1 and self.last and clips[-1]["path"] == self.last:
                 clips[0], clips[-1] = clips[-1], clips[0]
@@ -122,6 +139,25 @@ class Bag:
         c = self.bag.pop()
         self.last = c["path"]
         return c
+
+
+CALM_KEYS = None
+
+
+def desktop_rank(c):
+    """The Swift app's order: its twelve calm presets (in their order), then the other presets by name, then the styles."""
+    global CALM_KEYS
+    if CALM_KEYS is None:
+        try:
+            sys.path.insert(0, HERE)
+            import milkrender
+            CALM_KEYS = [k for _, k in milkrender.CALM]
+        except Exception:
+            CALM_KEYS = []
+    if c.get("kind") == "milkdrop":
+        k = c.get("preset", "")
+        return (0, CALM_KEYS.index(k), "") if k in CALM_KEYS else (1, 0, k.lower())
+    return (2, 0, str(c.get("style") or c.get("name")))
 
 
 def grade_filter(clip):
