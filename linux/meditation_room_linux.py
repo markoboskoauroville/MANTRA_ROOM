@@ -333,7 +333,7 @@ def run():
     print(f"[mrlinux] picture: {'clip library (mrvisuals)' if VIS[0] else 'mandala'}", flush=True)
     threading.Thread(target=card_loop, args=(stop,), daemon=True).start()
     chunk = SR * CH * 2 // 50          # 20 ms of PCM
-    lead = float(os.environ.get("MRL_LEAD", "1.0"))   # keep the encoder this many s ahead (was 0.25: a 0.4-0.7 s encode stall became a 1 s hole at the viewer; 15.11.2026)
+    lead0 = lead = float(os.environ.get("MRL_LEAD", "1.0"))   # keep the encoder this many s ahead (was 0.25: a 0.4-0.7 s encode stall became a 1 s hole at the viewer; 15.11.2026)
     i = 0
     while not stop.is_set():
         pc = poster_cfg()
@@ -347,7 +347,7 @@ def run():
         enc = Encoder(LOCAL_SRT, pc)
         enc.start()
         t0, sent = time.monotonic(), 0
-        lead = getattr(enc, "lead", 0.25)   # mrbuffer: may run up to its buffer ahead of real time
+        lead = getattr(enc, "lead", lead0)   # mrbuffer: may run up to its buffer ahead of real time
         STREAM_T[0] = 0.0
         try:
             while not stop.is_set() and enc.proc.poll() is None:
