@@ -42,8 +42,8 @@ SITE = "https://santoshi-band.pages.dev/api/live"
 SITE_TOKEN = "/etc/meditation-room-linux/site-token"
 ZAGREB = ZoneInfo("Europe/Zagreb")
 CARDS = os.environ.get("MRL_CARDS", HOME + "/MANTRA_ROOM/preshow/cards.json")  # shared with the Mac app (v13+)
-# Marko 15.11.2026: ONE block at a time, max 5 words, fade in ~3 s, hold ~7 s, fade out ~4 s, then 90-120 s of visuals only
-CARD_P, FADE_IN, HOLD, FADE_OUT = 120, 3.0, 7.0, 4.0
+# Marko 15.11.2026: ONE block at a time, max 5 words, fade in 3 s, at least 5 s readable, fade out 3 s, then 90-120 s of visuals only
+CARD_P, FADE_IN, HOLD, FADE_OUT = 120, 3.0, 5.0, 3.0
 CARD_ON = FADE_IN + HOLD + FADE_OUT
 NOON = (dt.time(11, 50), dt.time(13, 50))   # the noon replay owns the site (CLOUD MIXER show)
 

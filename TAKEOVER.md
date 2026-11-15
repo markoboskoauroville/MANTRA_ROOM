@@ -290,8 +290,8 @@ clone of this public repo: audio, linux, preshow; nothing from the Mac). Units a
 - **Picture** (ffmpeg only, no GPU): the stereo picture of the sound (avectorscope lissajous) mirrored four ways = a
   mandala, over a slow four-colour gradient, composed at 640x360 and scaled to 1280x720 25p; title, clock (Zagreb), the
   track bottom left. Text over it: `mrlinux text "..."` (centred, `\n` for lines). PRE-SHOW: `mrlinux preshow HH:MM`
-  (or `start --preshow-until HH:MM`): ONE text block at a time, max 5 words (Marko, 15.11.2026): fade in 3 s, hold 7 s,
-  fade out 4 s, then 106 s of visuals only (a 120 s cycle). The blocks alternate: "Live stream in N minutes" and a card
+  (or `start --preshow-until HH:MM`): ONE text block at a time, max 5 words (Marko, 15.11.2026): fade in 3 s, hold 5 s,
+  fade out 3 s, then 109 s of visuals only (a 120 s cycle). The blocks alternate: "Live stream in N minutes" and a card
   from `preshow/cards.json` (shared with the Mac app; its text if ≤5 words, else its title). No Devanagari (Ubuntu's
   ffmpeg cannot shape it).
 - **Why not butterchurn**: headless Chromium with SwiftShader on the VM's 2 Ampere cores drew butterchurn at 2.7 fps
