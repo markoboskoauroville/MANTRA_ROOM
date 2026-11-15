@@ -75,9 +75,9 @@ def graph():
            f"drawtext=fontfile={f}:text='Meditation Room  -  VM test stream':x=40:y=34:fontsize=26:fontcolor=white@0.7,"
            f"drawtext=fontfile={f}:text='%{{localtime\\:%T}}':x=w-tw-40:y=34:fontsize=26:fontcolor=white@0.7,"
            f"drawtext=fontfile={f}:textfile='{t('now.txt')}':reload=25:x=40:y=h-60:fontsize=24:fontcolor=white@0.6,"
-           f"drawtext=fontfile={f}:textfile='{t('count.txt')}':reload=25:x=(w-tw)/2:y=h*0.18:fontsize=44:fontcolor=white@0.9:"
+           f"drawtext=fontfile={f}:textfile='{t('count.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.18:fontsize=44:fontcolor=white@0.9:"
            "shadowcolor=black@0.6:shadowx=2:shadowy=2,"
-           f"drawtext=fontfile={f}:textfile='{t('text.txt')}':reload=25:x=(w-tw)/2:y=h*0.76:fontsize=48:fontcolor=white:"
+           f"drawtext=fontfile={f}:textfile='{t('text.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.72:fontsize=48:fontcolor=white:"
            "shadowcolor=black@0.7:shadowx=3:shadowy=3:line_spacing=10[vout]")
     return f"[0:a]asplit=2[aout][av];{scope};{bg};{out}"
 

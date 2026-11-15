@@ -5,6 +5,7 @@ After=mrlinux-relay.service
 
 [Service]
 User=ubuntu
+Environment=TZ=Europe/Zagreb
 ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/meditation_room_linux.py run
 Restart=on-failure
 RestartSec=5
