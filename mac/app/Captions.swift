@@ -19,6 +19,8 @@ final class Captions: ObservableObject {
     weak var viz: Viz?
     private var lines: [Line] = []
     private var shown = -1
+    @Published var engine = ""                 // TextFX.state() as the page reports it (for /api/state)
+    func poll() { viz?.web.evaluateJavaScript("window.TextFX ? JSON.stringify(TextFX.state()) : 'no TextFX'") { [weak self] r, e in self?.engine = (r as? String) ?? (e.map { "\($0)" } ?? "") } }
 
     private func q(_ s: String) -> String {
         guard let d = try? JSONSerialization.data(withJSONObject: [s]), let j = String(data: d, encoding: .utf8) else { return "\"\"" }

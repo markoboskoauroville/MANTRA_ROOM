@@ -106,7 +106,7 @@ final class Door {
             "lights": ["on": l.on, "mode": l.mode, "pattern": l.pattern, "way": l.way, "frames": l.sent, "fps": (l.fps * 10).rounded() / 10, "error": l.error],
             "visual": ["style": viz?.styleName ?? "", "auto": viz?.auto ?? true, "fps": ((viz?.fps ?? 0) * 10).rounded() / 10],
             "note": p.note, "songs_missing": Songs.missing.map(\.file),
-            "ndi": NDISender.shared.on, "duck": p.duckOn, "ducking": p.ducking, "text_on": Captions.shared.textOn, "preshow": Captions.shared.preOn, "preshow_until": Captions.shared.preUntil.map { Int($0.timeIntervalSince1970) } ?? 0, "title_hidden": App.shared.window?.titleVisibility == .hidden,
+            "ndi": NDISender.shared.on, "duck": p.duckOn, "ducking": p.ducking, "text_on": Captions.shared.textOn, "text_engine": Captions.shared.engine, "preshow": Captions.shared.preOn, "preshow_until": Captions.shared.preUntil.map { Int($0.timeIntervalSince1970) } ?? 0, "title_hidden": App.shared.window?.titleVisibility == .hidden,
             "window": NSApp.windows.first(where: { $0.title == APP_NAME })?.windowNumber ?? 0,
         ]
         if let u = p.until {

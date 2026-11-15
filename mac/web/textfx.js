@@ -110,6 +110,6 @@ window.TextFX = (function () {
     attach: attach, show: show, preshow: preshow,
     enable: function (b) { enabled = !!b; if (!enabled) queue.length = 0; },
     setCards: function (c) { cards = c || []; },
-    state: function () { return { enabled: enabled, preshow: pre.on, until: pre.until, queued: queue.length, shown: shownCount, last: lastText, cards: cards.length }; },
+    state: function () { return { enabled: enabled, preshow: pre.on, until: pre.until, queued: queue.length, shown: shownCount, last: lastText, cards: cards.length, attached: !!(viz && viz.renderer && viz.renderer.titleText), wrapped: !!(viz && viz.renderer && viz.renderer.titleText && viz.renderer.titleText.__wrapped), err: window.__err || "" }; },
   };
 })();

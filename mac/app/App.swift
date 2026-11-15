@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 13
+let VERSION = 14
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {
@@ -342,7 +342,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // the visual keeps running and the stream keeps going with the window behind others (no App Nap)
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
                                                          reason: "playing the meditation loop and the keyboard lights")
-        refresh = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.viz.refresh() }
+        refresh = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.viz.refresh(); Captions.shared.poll() }
         Songs.fetchMissing(progress: { [weak self] m in self?.player.note = m }) { [weak self] left in
             self?.player.note = left == 0 ? "" : "\(left) songs could not be downloaded"
             self?.arguments()
