@@ -2,12 +2,14 @@
 # Private test of the changing visuals (mrvisuals.py) on chromium-vm: the encoder FROM THIS CHECKOUT (not the installed copy)
 # publishes to its own MediaMTX path vistest (SRT 127.0.0.1:8993, HLS 127.0.0.1:8989), never vmtest or santoshi; Nice 19,
 # CPUWeight 20, so a real stream always wins the CPU. Records the stream, then frames every 2 s for a contact sheet.
-#   bash linux/vistest.sh [seconds=180] [preshow HH:MM]
+#   [POSTER=every,for] bash linux/vistest.sh [seconds=180] [preshow HH:MM]
 # Result: ~/mrvistest/{rec.ts,enc.log,report.txt,shots/}
 set -f
 SECS=${1:-180}; PRE=$2; D=$(cd "$(dirname "$0")" && pwd); W=~/mrvistest
 rm -rf "$W" ~/.cache/mrvistest; mkdir -p "$W/shots" ~/.cache/mrvistest; cd "$W"
 [ -n "$PRE" ] && echo "$PRE" > ~/.cache/mrvistest/preshow
+# POSTER="every,for" (env): the poster cycle in the test too (it fades over the visuals, the music goes on)
+[ -n "$POSTER" ] && printf '{"on": true, "every": %s, "for": %s}\n' "${POSTER%,*}" "${POSTER#*,}" > ~/.cache/mrvistest/poster.json
 ENV="--setenv=MRL_CACHE=/home/ubuntu/.cache/mrvistest --setenv=TZ=Europe/Zagreb --setenv=MRL_VISUALS=library"
 ENV="$ENV --setenv=MRL_SRT=srt://127.0.0.1:8993?streamid=publish:vistest&pkt_size=1316&latency=400000&transtype=live"
 cleanup() { sudo systemctl stop mrvistest-enc mrvistest-relay 2>/dev/null; sudo systemctl reset-failed 'mrvistest-*' 2>/dev/null; }
