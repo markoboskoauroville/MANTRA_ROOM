@@ -1,0 +1,19 @@
+[Unit]
+Description=Meditation Room (Linux): night render of MilkDrop presets into the clip library (milkrender.py night, idle only)
+After=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Environment=TZ=Europe/Zagreb
+Environment=MILK_CHROME=/usr/bin/google-chrome
+# the render may only take what nobody else wants: lowest priority, at most one of the two cores, idle disk class
+Nice=19
+CPUQuota=100%
+CPUWeight=1
+IOSchedulingClass=idle
+ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/milkrender.py night --until 07:00
+# it checks before and during every clip (meditation-room-linux, mrlinux-live, cloud-mixer, studio-ladder, relay path santoshi,
+# load > 2.5) and stops for the night when a stream runs; a hard end in any case
+RuntimeMaxSec=6h30min
+TimeoutStopSec=20

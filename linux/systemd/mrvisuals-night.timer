@@ -1,0 +1,9 @@
+[Unit]
+Description=Meditation Room (Linux): night render 01:00 Zagreb (until 07:00)
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 Europe/Zagreb
+Persistent=false
+
+[Install]
+WantedBy=timers.target

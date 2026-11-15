@@ -1,0 +1,24 @@
+# PRIVATE test relay for the render-ahead buffer (mrbuffer.py): path vistest only, everything on 127.0.0.1.
+# Never the public relay, never the mrlinux test relay (vmtest :8991). Run: mediamtx vistest-relay.yml
+logLevel: warn
+authMethod: internal
+authInternalUsers:
+  - {user: any, pass: "", ips: ["127.0.0.1", "::1"], permissions: [{action: publish, path: vistest}, {action: read}, {action: api}]}
+api: true
+apiAddress: 127.0.0.1:9994
+metrics: false
+pprof: false
+playback: false
+moq: false
+rtsp: false
+rtmp: false
+webrtc: false
+hls: true
+hlsAddress: 127.0.0.1:8989
+hlsVariant: lowLatency
+srt: true
+srtAddress: 127.0.0.1:8993
+paths:
+  vistest:
+    source: publisher
+    record: false

@@ -13,6 +13,9 @@
 #   mrlinux poster on [--every 120 --for 60] | poster off   the concert poster in silence between music (encoder restarts ~2 s)
 #   mrlinux pause-live                      free path santoshi, no site STOP, encoder keeps running (go-live ... --resume after)
 #   mrlinux checks                          would go-live be allowed now?
+#   mrlinux visuals [library|mandala|status] the picture: the changing clip library (MilkDrop presets rendered at night + the
+#                                           desktop's text) or the old mandala; taken at the encoder's next start
+#   mrlinux render [status|now|log]         the night render (timer 01:00-07:00, only while no stream runs)
 set -e
 LIB=/usr/local/lib/meditation-room-linux
 C=/home/ubuntu/.cache/mrlinux
@@ -58,6 +61,18 @@ case "${1:-status}" in
     pid=$(python3 -c "import json;print(json.load(open('$C/status.json')).get('pid',''))" 2>/dev/null); [ -n "$pid" ] && kill "$pid" 2>/dev/null; true;;
   checks)
     sudo python3 $LIB/meditation_room_linux.py checks;;
+  visuals)
+    case "${2:-status}" in
+      library|mandala) put visuals "$2"; echo "visuals: $2 (from the encoder's next start; now: sudo systemctl restart meditation-room-linux)";;
+      *) printf 'visuals switch: %s\n' "$(cat "$C/visuals" 2>/dev/null || echo 'library (default)')"; python3 $LIB/mrvisuals.py status;;
+    esac;;
+  render)
+    case "${2:-status}" in
+      now) sudo systemctl start mrvisuals-night.service; echo "night render started (stops by itself when a stream runs)";;
+      log) tail -30 "$C/milkrender.log";;
+      *) systemctl list-timers mrvisuals-night.timer --no-pager | sed -n 1,2p; printf 'render: %s\n' "$(systemctl is-active mrvisuals-night.service)"
+         python3 $LIB/milkrender.py status | head -1; tail -3 "$C/milkrender.log" 2>/dev/null;;
+    esac;;
   text)
     if [ "$2" = "--clear" ] || [ -z "$2" ]; then put text.txt ""; echo "text cleared"; else put text.txt "$2"; echo "text set"; fi;;
   title)

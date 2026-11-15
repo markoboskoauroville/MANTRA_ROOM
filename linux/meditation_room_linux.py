@@ -35,10 +35,10 @@ from zoneinfo import ZoneInfo
 
 HOME = os.path.expanduser("~ubuntu")
 AUDIO = os.environ.get("MRL_AUDIO", HOME + "/MANTRA_ROOM/android/app/src/main/assets/web/audio")
-CACHE = HOME + "/.cache/mrlinux"
+CACHE = os.environ.get("MRL_CACHE", HOME + "/.cache/mrlinux")   # a private test instance has its own (vistest.sh)
 FONT = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
 SR, CH = 48000, 2
-LOCAL_SRT = "srt://127.0.0.1:8991?streamid=publish:vmtest&pkt_size=1316&latency=400000&transtype=live"
+LOCAL_SRT = os.environ.get("MRL_SRT", "srt://127.0.0.1:8991?streamid=publish:vmtest&pkt_size=1316&latency=400000&transtype=live")
 LOCAL_READ = "srt://127.0.0.1:8991?streamid=read:vmtest&latency=400000&transtype=live"
 PUBLIC_KEY = "/etc/santoshi-relay/key"
 SITE = "https://santoshi-band.pages.dev/api/live"
@@ -77,6 +77,30 @@ CLOCK = "%{localtime\\:%T}"   # drawtext text of the clock; mrbuffer draws the t
 AHEAD = [0.0]                 # seconds between rendering and playout (the pre-show countdown is computed for the playout)
 
 
+# Hook for the changing visuals (linux/mrvisuals.py): the picture from the clip library (MilkDrop presets rendered offline,
+# cross-faded, no repeats) and the desktop's one-block text drawn into those frames. None = the old mandala.
+VIS = [None]
+
+
+def load_visuals():
+    """~/.cache/mrlinux/visuals: 'library' (default when the library has clips) or 'mandala'; env MRL_VISUALS wins."""
+    mode = os.environ.get("MRL_VISUALS", "")
+    if not mode:
+        try:
+            mode = open(CACHE + "/visuals").read().strip()
+        except OSError:
+            mode = "library"
+    if mode != "library":
+        return None
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import mrvisuals
+        return mrvisuals.Visuals.create(sys.modules[__name__])
+    except Exception as e:
+        print(f"[mrlinux] visuals library not available ({e}): the mandala", flush=True)
+        return None
+
+
 def now_playout():
     return dt.datetime.now(ZAGREB) + dt.timedelta(seconds=AHEAD[0])
 
@@ -109,6 +133,10 @@ def graph(pc=None):
            f"drawtext=fontfile={f}:textfile='{t('text.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.72:fontsize=48:fontcolor=white:"
            "box=1:boxcolor=black@0.38:boxborderw=20:line_spacing=10[vout]")
     g = f"[0:a]asplit=2[aout][av];{scope};{bg};{out}"
+    if VIS[0]:   # the clip library's frames (input 1, already 1280x720 with the text block drawn in) replace the mandala
+        out = out.replace("[bg][scope]blend=all_mode=screen:shortest=1,format=yuv420p,scale=1280:720:flags=bicubic,",
+                          "[1:v]setpts=N/(25*TB),format=yuv420p,").replace(card("block.txt", f, 48, 0), "")
+        g = f"[0:a]anull[aout];{out}"
     if pc:   # the poster over everything (picture, clock, text) for `for` s of every cycle; one decoded frame, looped
         cyc = pc["every"] + pc["for"]
         g = g.replace("[vout]", "[vmain]") + (
@@ -131,7 +159,14 @@ class Encoder:
                "-pix_fmt", "yuv420p", "-threads", "2",
                "-c:a", "libopus", "-b:a", "128k", "-ar", str(SR), "-ac", "2",
                *self.out_args()]
-        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        vis, fds = VIS[0], ()
+        if vis:
+            vin, fds = vis.input_args()
+            i = cmd.index("-filter_complex")
+            cmd[i:i] = vin
+        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, pass_fds=fds)
+        if vis:
+            vis.started(self.proc)
         threading.Thread(target=self._progress, daemon=True).start()
 
     def out_args(self):
@@ -245,6 +280,8 @@ def preshow_on():
 
 def card_loop(stop):
     import random
+    if VIS[0]:
+        return   # the visuals library draws the text blocks itself (the desktop's scheduler)
     order, last_cycle = [], -1
     while not stop.is_set():
         st = STREAM_T[0]
@@ -285,6 +322,8 @@ def run():
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
+    VIS[0] = load_visuals()
+    print(f"[mrlinux] picture: {'clip library (mrvisuals)' if VIS[0] else 'mandala'}", flush=True)
     threading.Thread(target=card_loop, args=(stop,), daemon=True).start()
     chunk = SR * CH * 2 // 50          # 20 ms of PCM
     lead = float(os.environ.get("MRL_LEAD", "1.0"))   # keep the encoder this many s ahead (was 0.25: a 0.4-0.7 s encode stall became a 1 s hole at the viewer; 15.11.2026)
@@ -312,6 +351,8 @@ def run():
                     continue
                 enc.track = title
                 wfile(CACHE + "/now.txt", title)
+                if VIS[0]:
+                    VIS[0].track_start(fname, title, STREAM_T[0])
                 print(f"[mrlinux] track {title}", flush=True)
                 dec = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-i", path, "-f", "s16le", "-ar", str(SR),
                                         "-ac", str(CH), "pipe:1"], stdout=subprocess.PIPE)
