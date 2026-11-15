@@ -22,7 +22,7 @@ struct NDIAudioFrame {
 
 final class NDISender: ObservableObject {
     static let shared = NDISender()
-    static let sourceName = "Meditation Room (Mantra)"
+    static let sourceName = "Meditation Room"   // no nested parentheses: NDI Video Monitor lists but cannot connect to "Meditation Room (Mantra)"
     @Published var on = false
     @Published var note = ""
     weak var viz: Viz?

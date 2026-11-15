@@ -213,3 +213,9 @@ Reading (master): "CADefaultDeviceAggregate-..." is a private aggregate the syst
 > please also update my app Meditation Room to have NDI HX output
 
 Reading (master): the Mac app sends its picture and its sound as an NDI source "Meditation Room (Mantra)" (OBS, vMix, Sound Link studio.py receive it); an NDI word in the title row (AX) toggles it, saved, flag --ndi. Real HX (H.264/HEVC) sending needs the NDI Advanced SDK for macOS, which we do not have (the Advanced SDK we hold is Android only); the installed runtime sends full NDI (SpeedHQ). Shipped as full NDI, not pretended as HX. Mac v8.
+
+## Request 43 (15.11.2026): the room is not showing in NDI Video Monitor
+
+> the room is not showing. Please debug it. Find the reason ... This is the final test. I want to see in this NDI video monitor streams from my phone, streams from my meditation application, etc.
+
+Reading (master): debugged with an own receiver (frames arrive: 1280x720 BGRA, 25 fps, real picture) and with NDI Video Monitor driven through its menu: the Monitor lists the source as "Meditation Room" and the official Test Patterns shows, but ours stays black. The nested parentheses in the source name "Meditation Room (Mantra)" are the suspect; v10 names the source "Meditation Room".
