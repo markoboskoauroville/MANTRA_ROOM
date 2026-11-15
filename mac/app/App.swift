@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 2
+let VERSION = 3
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {
@@ -87,7 +87,7 @@ struct TopRow: View {
         .frame(height: 32)
         .onAppear { DispatchQueue.main.async { TopRow.float(onTop) } }
     }
-    static func float(_ on: Bool) { App.shared.window?.level = on ? .floating : .normal }
+    static func float(_ on: Bool) { App.shared.window?.level = on ? .floating : .normal; App.shared.enforceOneTitle() }
 }
 
 struct VizView: NSViewRepresentable {
@@ -280,8 +280,31 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         w.center()
         w.setFrameAutosaveName("MeditationRoomMain")
         window = w
+        enforceOneTitle(w)
         w.orderFront(nil)
+        DispatchQueue.main.async { self.enforceOneTitle(w) }
     }
+
+    /// ONE TITLE ONLY (Marko 15.11.2026: "don't repeat this bug"). The app draws its own title (TopRow); the system title
+    /// stays hidden in every state: creation, key, resize, full screen, TOP. Called from all of them; also blanks any
+    /// title text field AppKit keeps in the title bar (the faded echo). MANTRA_MANIFEST modules/one-title-only.md.
+    func enforceOneTitle(_ w: NSWindow? = nil) {
+        guard let w = w ?? window else { return }
+        w.title = APP_NAME                      // kept for Mission Control and Accessibility, never drawn
+        w.titleVisibility = .hidden
+        w.titlebarAppearsTransparent = true
+        func walk(_ v: NSView) {
+            if v === w.contentView { return }   // the app's own title lives inside; do not touch it
+            if let t = v as? NSTextField, t.stringValue == APP_NAME { t.isHidden = true; t.alphaValue = 0 }
+            v.subviews.forEach(walk)
+        }
+        if let frame = w.contentView?.superview { walk(frame) }
+    }
+    func windowDidBecomeKey(_ n: Notification) { enforceOneTitle() }
+    func windowDidResignKey(_ n: Notification) { enforceOneTitle() }
+    func windowDidResize(_ n: Notification) { enforceOneTitle() }
+    func windowDidEnterFullScreen(_ n: Notification) { enforceOneTitle() }
+    func windowDidExitFullScreen(_ n: Notification) { enforceOneTitle() }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }   // ✕ closes the window, the sound goes on
     func applicationShouldHandleReopen(_ s: NSApplication, hasVisibleWindows: Bool) -> Bool {

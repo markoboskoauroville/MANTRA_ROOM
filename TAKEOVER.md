@@ -257,3 +257,5 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
 - **Stands (15.11.2026)**: v1 (run 43681445210) and v2 (run 43681879207) green on the first run, v2 installed, visual
   60 fps, G815 Lights /status mode stream at about 20 fps. Test stream until 11:55 into BlackHole 2ch (Sound Link →
   Pixel → camera on the keyboard), -5 dB gain.
+- **Mac v3 (15.11.2026)**: one title only (Request 36). enforceOneTitle() in App.swift on every window state; guard
+  mac/check_one_title.sh first in .github/workflows/mac.yml; state shows title_hidden. Release mac-v3.

@@ -22,6 +22,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Guard, one title only
+        run: ./mac/check_one_title.sh
       - name: Build
         run: SIGN=- NO_INSTALL=1 ./mac/build.sh
       - name: Pack

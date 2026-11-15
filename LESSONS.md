@@ -56,3 +56,8 @@
 - One repository, two apps: Mac tags mac-vN not Latest, or the site's releases/latest button would offer a Mac zip.
 - Another worker's running process (G815 lightshow.py) is not ours to kill: the permission classifier refused it; ask
   the master, the keys take one painter at a time.
+- ONE TITLE ONLY (15.11.2026, the bug came back, v3): the app draws its own bold title in TopRow; the system title must
+  never show. v1/v2 set titleVisibility = .hidden once at creation, but AppKit's title text field (faded echo) still
+  peeked out behind the transparent title bar in later states. Now enforceOneTitle() runs at creation and on key, resize,
+  full screen and the TOP toggle, and blanks the title text field; mac/check_one_title.sh fails the workflow otherwise.
+  Rule: MANTRA_MANIFEST modules/one-title-only.md.
