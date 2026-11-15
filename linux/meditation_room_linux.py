@@ -402,7 +402,7 @@ def site_stop_if_ours():
         return
     try:
         d = site("status")
-        if d.get("live") and d.get("name") == "VM Test":
+        if d.get("live") and d.get("name") in ("VM Test", "VMTest"):
             print("[mrlinux] safety STOP: " + json.dumps(site("stop")), flush=True)
     except Exception as e:
         print(f"[mrlinux] safety check failed: {e}", flush=True)
