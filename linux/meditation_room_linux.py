@@ -287,7 +287,7 @@ def run():
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     threading.Thread(target=card_loop, args=(stop,), daemon=True).start()
     chunk = SR * CH * 2 // 50          # 20 ms of PCM
-    lead = 0.25                        # keep the encoder a quarter second ahead, never more
+    lead = float(os.environ.get("MRL_LEAD", "1.0"))   # keep the encoder this many s ahead (was 0.25: a 0.4-0.7 s encode stall became a 1 s hole at the viewer; 15.11.2026)
     i = 0
     while not stop.is_set():
         pc = poster_cfg()

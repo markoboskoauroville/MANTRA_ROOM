@@ -89,3 +89,6 @@
   a filter switch inside one ffmpeg and needs no restart. Site fix (not done here): in player.js reload whep() when video.currentTime stands still > 8 s.
 - Poster: `mrlinux poster on --every 120 --for 60` writes poster.json; the encoder reads it at start. A new encoder with the poster
   on can be started by writing poster.json by hand + pause-live + restart + go-live --resume (no ffmpeg kill => no dead forward).
+- Even with CPU free, the stream had a 0.7-1 s hole about once a minute (seen identically in the Chrome tab and in an independent
+  ffmpeg read of the public HLS, so it is in the stream, not the monitor). The feeder kept the encoder only 0.25 s ahead, so any
+  encode stall > 0.4 s (the viewer's WebRTC jitter buffer) became a hole. `lead` is now 1.0 s (env MRL_LEAD), restart at 10:53.
