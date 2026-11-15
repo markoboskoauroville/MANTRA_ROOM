@@ -7,6 +7,7 @@
 // (OBS, vMix, Sound Link) take it the same way.
 import AppKit
 import AVFoundation
+import ImageIO
 import WebKit
 
 struct NDISendCreate { var p_ndi_name: UnsafePointer<CChar>?; var p_groups: UnsafePointer<CChar>?; var clock_video: Bool; var clock_audio: Bool }
@@ -98,6 +99,7 @@ final class NDISender: ObservableObject {
         t.setEventHandler { [weak self] in self?.tick() }
         t.resume(); timer = t
         lastSnap = Date()
+        viz?.web.evaluateJavaScript("room.ndi(true)", completionHandler: nil)
         pumpToken += 1; pump(pumpToken)
         watchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self, self.on, Date().timeIntervalSince(self.lastSnap) > 1.5 else { return }
@@ -109,6 +111,7 @@ final class NDISender: ObservableObject {
         timer?.cancel(); timer = nil
         watchdog?.invalidate(); watchdog = nil
         pumpToken += 1
+        viz?.web.evaluateJavaScript("room.ndi(false)", completionHandler: nil)
     }
     /// every 40 ms on q: the newest picture goes out, BGRX (alpha is always 255, so no alpha channel is promised)
     private func tick() {
@@ -122,36 +125,29 @@ final class NDISender: ObservableObject {
             withUnsafePointer(to: &fr) { f(s, UnsafeRawPointer($0)) }
         }
     }
+    /// polls the page for the newest JPEG of the canvas (grabbed in the page itself, see index.html grabNdi)
     private func pump(_ token: Int) {
         guard on, token == pumpToken, let web = viz?.web else { return }
-        let cfg = WKSnapshotConfiguration()
-        cfg.snapshotWidth = 1280
-        web.takeSnapshot(with: cfg) { [weak self] img, _ in
+        web.evaluateJavaScript("room.jpeg()") { [weak self] res, _ in
             guard let self = self, self.on, token == self.pumpToken else { return }
             self.lastSnap = Date()
-            if let img = img { self.store(img) }
-            DispatchQueue.main.async { self.pump(token) }
+            if let b64 = res as? String, !b64.isEmpty { self.store(b64) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { self.pump(token) }
         }
     }
-    /// fits the snapshot into 1280x720 (black bars when the window is not 16:9) and keeps it as the newest picture
-    private func store(_ img: NSImage) {
-        var r = CGRect(origin: .zero, size: img.size)
-        guard let cg = img.cgImage(forProposedRect: &r, context: nil, hints: nil), cg.width > 0, cg.height > 0 else { return }
-        let w = 1280, h = 720, stride = w * 4
-        let k = min(Double(w) / Double(cg.width), Double(h) / Double(cg.height))
-        let dw = Double(cg.width) * k, dh = Double(cg.height) * k
-        let dest = CGRect(x: (Double(w) - dw) / 2, y: (Double(h) - dh) / 2, width: dw, height: dh)
+    /// JPEG (1280x720 already, bars included) -> BGRX, kept as the newest picture; decoded off the main thread
+    private func store(_ b64: String) {
         q.async { [weak self] in
-            guard let self = self, self.on else { return }
+            guard let self = self, self.on, let d = Data(base64Encoded: b64),
+                  let src = CGImageSourceCreateWithData(d as CFData, nil), let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
+            let w = 1280, h = 720, stride = w * 4
             var buf = [UInt8](repeating: 0, count: stride * h)
             buf.withUnsafeMutableBytes { raw in
                 guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: stride,
                                           space: CGColorSpaceCreateDeviceRGB(),
                                           bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
                 else { return }
-                ctx.interpolationQuality = .medium
-                ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1)); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-                ctx.draw(cg, in: dest)
+                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
             }
             self.latest = buf
         }

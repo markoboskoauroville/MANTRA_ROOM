@@ -1,0 +1,16 @@
+[Unit]
+Description=Meditation Room (Linux): test stream encoder (tracks + mandala -> 720p25 H.264/Opus -> private relay vmtest)
+Requires=mrlinux-relay.service
+After=mrlinux-relay.service
+
+[Service]
+User=ubuntu
+ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/meditation_room_linux.py run
+Restart=on-failure
+RestartSec=5
+Nice=5
+CPUQuota=120%
+# NOT enabled at boot, no timer: started by `mrlinux start` only (Marko, 15.11.2026)
+
+[Install]
+WantedBy=multi-user.target

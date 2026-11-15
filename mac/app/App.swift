@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 11
+let VERSION = 12
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {
@@ -243,7 +243,7 @@ struct Root: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: 24) {
+            Flow(spacing: 24) {
                 Cell(label: "GAIN") {
                     HStack(spacing: 6) {
                         Text("−").word("Gain down", id: "gain-down") { player.setGain(player.gainDb - 1) }
@@ -260,11 +260,10 @@ struct Root: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
             }
 
             Hairline()
-            HStack(alignment: .top, spacing: 24) {
+            Flow(spacing: 24) {
                 Cell(label: "KEYBOARD LIGHTS") {
                     Text(lights.on ? "ON" : "OFF").foregroundStyle(lights.on ? Ink.green : Ink.grey)
                         .word("Keyboard lights", id: "lights", value: lights.on ? "on" : "off") { lights.set(!lights.on) }
@@ -273,14 +272,14 @@ struct Root: View {
                     HStack(spacing: 4) {
                         ForEach(["meditation", "patterns", "both"], id: \.self) { m in
                             if m != "meditation" { Text("|").foregroundStyle(Ink.dim) }
-                            Text(m.uppercased()).foregroundStyle(lights.mode == m ? Ink.green : Ink.grey)
+                            Text(m.uppercased()).fixedSize().foregroundStyle(lights.mode == m ? Ink.green : Ink.grey)
                                 .word("Lights show " + m, id: "lights-" + m, value: lights.mode == m ? "on" : "off") { lights.setMode(m) }
                         }
                     }
                 }
                 Cell(label: "G815") {
                     Text(lights.on ? (lights.error.isEmpty ? (lights.pattern.isEmpty ? "\(lights.way) · \(Int(lights.fps.rounded())) fps · \(lights.sent) frames" : "pattern \(lights.pattern)") : lights.error) : "—")
-                        .foregroundStyle(lights.error.isEmpty ? Ink.text : Ink.amber).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(lights.error.isEmpty ? Ink.text : Ink.amber).fixedSize()
                 }
                 Cell(label: "VISUAL") {
                     HStack(spacing: 6) {
@@ -291,7 +290,6 @@ struct Root: View {
                             .word("Auto style", id: "style-auto", value: viz.auto ? "on" : "off") { viz.setAuto(!viz.auto) }
                     }
                 }
-                Spacer(minLength: 0)
             }
             if !player.note.isEmpty {
                 Text(player.note).font(.system(size: 12)).foregroundStyle(Ink.amber)

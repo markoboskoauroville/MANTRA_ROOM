@@ -11,7 +11,11 @@ APP="build/$NAME.app"
 rm -rf build; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/web/vendor"
 swiftc -O -swift-version 5 -parse-as-library -o "$APP/Contents/MacOS/MeditationRoom" app/*.swift 2>&1 | grep -v "warning:" || true
 [ -x "$APP/Contents/MacOS/MeditationRoom" ] || { echo "the app did not build"; exit 1; }
-cp web/index.html "$APP/Contents/Resources/web/"
+cp web/index.html web/textfx.js "$APP/Contents/Resources/web/"
+mkdir -p "$APP/Contents/Resources/web/preshow" "$APP/Contents/Resources/web/lines"
+cp ../preshow/cards.json "$APP/Contents/Resources/web/preshow/"
+{ printf 'window.PRESHOW_CARDS='; cat ../preshow/cards.json; printf ';\n'; } > "$APP/Contents/Resources/web/preshow/cards.js"
+cp web/lines/*.json "$APP/Contents/Resources/web/lines/"
 cp ../android/app/src/main/assets/web/vendor/* "$APP/Contents/Resources/web/vendor/"
 cat > "$APP/Contents/Info.plist" <<PL
 <?xml version="1.0" encoding="UTF-8"?>

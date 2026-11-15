@@ -274,3 +274,4 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
 - **Mac v10**: NDI source name is 'Meditation Room' (no nested parentheses). v9 name 'Meditation Room (Mantra)' arrived at an own receiver but NDI Video Monitor stayed black while Test Patterns showed.
 - v10 proven: NDI Video Monitor (menu NDI > MACBOOK-PRO.LOCAL > Meditation Room) shows the picture, 720/25p.
 - **Mac v11**: NDI sends BGRX (0x58524742) on a steady 25 Hz timer (resends the last picture); snapshots run in their own loop with a 1.5 s watchdog.
+- **Mac v12**: flicker fixed (NDI picture grabbed inside the page, no takeSnapshot), control rows wrap by whole cells; web/textfx.js + preshow/cards.json + web/lines/guide.mp3.json bundled (the Swift side of the text comes in v13).

@@ -1,0 +1,14 @@
+[Unit]
+Description=Meditation Room (Linux): private test relay (MediaMTX, SRT 127.0.0.1:8991, HLS Tailscale :8987)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+ExecStart=/opt/mediamtx/current/mediamtx /usr/local/lib/meditation-room-linux/mrlinux-relay.yml
+Restart=on-failure
+RestartSec=3
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

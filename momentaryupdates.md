@@ -229,3 +229,17 @@ Reading (worker): `meditation-room-linux` in linux/, on chromium-vm: the meditat
 ## Request 44 (15.11.2026): NDI review fixes
 
 Coordinator, from MANTRA_MANIFEST modules/ndi-best-practice.md: send BGRX instead of BGRA (alpha is always 255; Sound Link skips non-UYVY, a BGRA frame was handed to receivers asking UYVY_BGRA), and pace video on a steady 25 Hz timer that resends the last frame, with a watchdog for a snapshot callback that never returns. Mac v11.
+
+## Request 45 (15.11.2026): the Meditation Room window flickers
+
+> please look at the meditation room screen. It's flickering. The NDI stream looks good, but what is the meditation room showing? It's flickering
+
+Reading (master): measured with 12 window frames at 100 ms: NDI off = steady brightness, NDI on = a dark flash frame (mean 6.7 against 31). The cause is WKWebView.takeSnapshot, which forces the visible web view to re-render. Fix (Mac v12): the page grabs the canvas itself (JPEG, 1280x720, right after render, 25 Hz) and Swift only polls it. Also: the control rows wrap whole cells (no more MEDITAT/ION), and the gain showing -23 dB is looked into.
+
+## Request 46 (15.11.2026): melting text (MilkDrop's title animation), then PRE-SHOW
+
+> Drop has a way to show the text over the screen. This is what it does, and then it is melting with the visuals. Please make this feature available in this application. When the voice is speaking anything, it should have the text on the screen, which is melting and transformed by visualization Winamp had that when the music starts to play, then it will display the artist and title, which will disappear in a beautiful way
+
+> the same principle we can use before we start to stream the concert: this visualization and this music can run, and then the text can say, "I don't know, 10 minutes until the live stream," and then 20 minutes, and then it dissolves. It can also teach people about Sanskrit mantras, everything that's on the website. We can summarize and just slowly, spoon by spoon, feed the audience who are watching our visualization. The text is coming from time to time
+
+Reading (master): butterchurn's own launchSongTitleAnim draws the text INTO the feedback frame so the preset melts it; web/textfx.js (portable, shared with the Linux VM version) wraps it, adds the PRE-SHOW countdown (20/10/5/1 minutes) and teaching cards (preshow/cards.json, 31 cards), local API /api/text, toggles TEXT and PRE-SHOW. Track-start titles and the guide's spoken lines (timed with Whisper through MANTRA_VOICE /hear). The six voice tracks are toning (sung vowels), Whisper hears nothing real in them, so only the guide has lines.

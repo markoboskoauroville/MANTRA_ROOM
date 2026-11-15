@@ -1,0 +1,26 @@
+# Meditation Room (Linux): the PRIVATE test relay. Nothing here is public: SRT and the API on 127.0.0.1, HLS on the
+# Tailscale address only (watch from a Tailscale device: http://100.102.86.30:8987/vmtest/index.m3u8).
+# The public Santoshi relay (/etc/mediamtx/mediamtx.yml, path santoshi) is never touched by this file.
+logLevel: info
+authMethod: internal
+authInternalUsers:
+  - {user: any, pass: "", ips: ["127.0.0.1", "::1"], permissions: [{action: publish, path: vmtest}, {action: read}, {action: api}]}
+  - {user: any, pass: "", ips: ["100.64.0.0/10"], permissions: [{action: read, path: vmtest}]}
+api: true
+apiAddress: 127.0.0.1:9996
+metrics: false
+pprof: false
+playback: false
+rtsp: false
+rtmp: false
+webrtc: false
+hls: true
+hlsAddress: 100.102.86.30:8987
+hlsVariant: lowLatency
+hlsAllowOrigin: "*"
+srt: true
+srtAddress: 127.0.0.1:8991
+paths:
+  vmtest:
+    source: publisher
+    record: false

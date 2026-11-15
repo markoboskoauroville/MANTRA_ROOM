@@ -12,6 +12,8 @@ canvas#milk{width:100%;height:100%;display:block}
 <canvas id="milk"></canvas>
 <script src="vendor/butterchurn.min.js"></script>
 <script src="vendor/butterchurnPresets.min.js"></script>
+<script src="preshow/cards.js"></script>
+<script src="textfx.js"></script>
 <script>
 // Meditation Room (Mantra) on the Mac: the MilkDrop engine of the Android app (butterchurn 2.6.7, the same twelve calm
 // presets first). The sound is native (AVAudioEngine in Swift); Swift calls room.tick() 60 times a second with the last
@@ -59,7 +61,7 @@ function load(i, blend){
 }
 function init(){
   size();
-  if(BC){ viz = BC.createVisualizer(actx, c, {width:c.width, height:c.height, pixelRatio:1, textureRatio:1}); load(ix, 0); }
+  if(BC){ viz = BC.createVisualizer(actx, c, {width:c.width, height:c.height, pixelRatio:1, textureRatio:1}); load(ix, 0); if(window.TextFX) TextFX.attach(viz); }
 }
 function fill(arr, b64){
   if(!b64) return;
@@ -68,7 +70,25 @@ function fill(arr, b64){
 }
 const HEX = []; for(let i=0;i<256;i++) HEX.push((i<16?"0":"")+i.toString(16));
 
+// NDI picture: a JPEG of the canvas, grabbed here, in the same task right after render() (the only moment a WebGL canvas can
+// be read without preserveDrawingBuffer), 25 times a second, 1280x720 with black bars. Swift only polls room.jpeg(): nothing
+// forces the visible web view to re-render (WKWebView.takeSnapshot did, and made the window flicker).
+const g3 = document.createElement("canvas"); g3.width = 1280; g3.height = 720;
+const x3 = g3.getContext("2d");
+let ndiOn = false, lastCap = 0, lastJpeg = "", jpegSeq = 0, sentSeq = 0;
+function grabNdi(){
+  const now = performance.now();
+  if(now - lastCap < 38) return;
+  lastCap = now;
+  x3.fillStyle = "#000"; x3.fillRect(0, 0, 1280, 720);
+  const k = Math.min(1280 / c.width, 720 / c.height), dw = c.width * k, dh = c.height * k;
+  x3.drawImage(c, (1280 - dw) / 2, (720 - dh) / 2, dw, dh);
+  lastJpeg = g3.toDataURL("image/jpeg", 0.85).slice(23);    // after "data:image/jpeg;base64,"
+  jpegSeq++;
+}
 window.room = {
+  ndi(on){ ndiOn = !!on; },
+  jpeg(){ if(sentSeq === jpegSeq) return ""; sentSeq = jpegSeq; return lastJpeg; },
   // l, r: base64 of 1024 unsigned bytes (128 = silence); gw, gh: the size of the frame wanted back, 0 = none
   tick(l, r, gw, gh){
     if(!viz) return "";
@@ -77,6 +97,7 @@ window.room = {
     if(auto && performance.now() - lastChange > 40000) load(ix + 1, 6);   // Auto, as on the phone: every 40 s, 6 s blend
     viz.render({audioLevels:{timeByteArray:M, timeByteArrayL:L, timeByteArrayR:R}});
     frames++;
+    if(ndiOn) grabNdi();
     if(!gw || !gh) return "";
     // two steps (4x, then the size asked) so the small picture is an average, not a few sampled pixels
     if(g1.width !== gw*4 || g1.height !== gh*4){ g1.width = gw*4; g1.height = gh*4; }

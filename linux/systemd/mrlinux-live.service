@@ -1,0 +1,13 @@
+[Unit]
+Description=Meditation Room (Linux): GO LIVE on the Santoshi site as camera "VM Test" (copy vmtest -> relay path santoshi)
+Requires=meditation-room-linux.service
+After=meditation-room-linux.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/run/mrlinux-live.env
+ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/meditation_room_linux.py live ${MRL_MINUTES}
+ExecStopPost=/usr/bin/python3 /usr/local/lib/meditation-room-linux/meditation_room_linux.py site-stop-if-ours
+Restart=no
+RuntimeMaxSec=1800
+TimeoutStopSec=30
