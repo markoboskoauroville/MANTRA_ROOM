@@ -282,11 +282,12 @@ class Publisher:
                 self.done.pop(run, None)
 
     def make_filler(self, src):
-        """The last segment's picture with silence, same codecs (copied video, Opus silence)."""
+        """The last segment's picture with silence, same codecs (copied video, AAC silence, as the encoder since 15.11.2026)."""
         tmp = RING + "/filler.tmp.ts"
         r = subprocess.run(["nice", "-n", "5", "ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-i", src,
                             "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-map", "0:v:0", "-map", "1:a:0",
-                            "-c:v", "copy", "-c:a", "libopus", "-b:a", "128k", "-ar", "48000", "-ac", "2", "-shortest",
+                            "-c:v", "copy", *(["-c:a", "libopus", "-b:a", "128k"] if os.environ.get("MRL_ACODEC") == "opus"
+                                              else ["-c:a", "aac", "-b:a", "160k"]), "-ar", "48000", "-ac", "2", "-shortest",
                             "-f", "mpegts", "-y", tmp])
         if r.returncode == 0 and os.path.getsize(tmp) > 10000:
             os.replace(tmp, self.filler)

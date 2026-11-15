@@ -7,7 +7,7 @@ Marko, 15.11.2026: "make the Linux version of this meditation room and install i
   run    the encoder (systemd meditation-room-linux, user ubuntu): the thirteen tracks of the Mac app (the guide, then each
          element Mantra Voice + Indian Raga, OM) decoded one after another into one paced PCM stream -> ffmpeg draws the
          picture from the sound (avectorscope mirrored four ways = a mandala, over a slow gradient), the clock, the track,
-         the text written over it, and the pre-show countdown -> H.264 baseline + Opus, 1280x720 25p -> SRT to the
+         the text written over it, and the pre-show countdown -> H.264 baseline + AAC, 1280x720 25p -> SRT to the
          PRIVATE test relay (mrlinux-relay, MediaMTX 127.0.0.1:8991, path vmtest). Never the public path by itself.
   live   the go-live (systemd mrlinux-live, root): checks (not 11:50-13:50 Zagreb, site not live, public path santoshi
          free), copies vmtest -> the public relay path santoshi (-c copy, no second encoder), then GO on the site as the
@@ -157,7 +157,10 @@ class Encoder:
                "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-profile:v", "baseline", "-bf", "0",
                "-g", "50", "-keyint_min", "50", "-r", "25", "-b:v", "2500k", "-maxrate", "2500k", "-bufsize", "2500k",
                "-pix_fmt", "yuv420p", "-threads", "2",
-               "-c:a", "libopus", "-b:a", "128k", "-ar", str(SR), "-ac", "2",
+               # AAC (Marko, 15.11.2026: iPhone plays HLS with AAC, not Opus); stereo 48 kHz 160 kbit/s. MRL_ACODEC=opus = the old way
+               # (WebRTC/WHEP readers of MediaMTX need Opus: with AAC a WHEP viewer gets the picture without sound)
+               *(["-c:a", "libopus", "-b:a", "128k"] if os.environ.get("MRL_ACODEC") == "opus" else ["-c:a", "aac", "-b:a", "160k"]),
+               "-ar", str(SR), "-ac", "2",
                *self.out_args()]
         vis, fds = VIS[0], ()
         if vis:
