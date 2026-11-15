@@ -167,6 +167,7 @@ final class Player: ObservableObject {
     @Published var gainDb: Double = UserDefaults.standard.object(forKey: "gainDb") as? Double ?? 0
     @Published var until: Date? = nil
     @Published var note = ""
+    @Published var styleLock: String = UserDefaults.standard.string(forKey: "styleLock") ?? ""   // "" = both styles in the loop
     @Published var played = 0                     // tracks started since launch (evidence of the loop)
 
     /// the first ticked device (the one the picture and the position are read from)
@@ -299,7 +300,25 @@ final class Player: ObservableObject {
             playing = false
         }
     }
-    func next() { play(index + 1) }
+    /// the next track; once a style is chosen (styleLock) the other style is skipped, the guide and OM-less tracks stay
+    private func following() -> Int {
+        var n = (index + 1) % TRACKS.count
+        for _ in 0..<TRACKS.count where !styleLock.isEmpty && !TRACKS[n].style.isEmpty && TRACKS[n].style != styleLock {
+            n = (n + 1) % TRACKS.count
+        }
+        return n
+    }
+    func next() { play(following()) }
+    /// a click on the style word: Indian Raga <-> Mantra Voice of the same element, from the start, and the loop keeps that style
+    func toggleStyle() {
+        let cur = TRACKS[index].style
+        guard !cur.isEmpty else { return }
+        let other = cur == "Mantra Voice" ? "Indian Raga" : "Mantra Voice"
+        styleLock = other
+        UserDefaults.standard.set(other, forKey: "styleLock")
+        let e = TRACKS[index].element
+        if let j = TRACKS.firstIndex(where: { $0.element == e && $0.style == other }) { play(j) }
+    }
     func stop() {
         gen += 1
         for l in lanes { l.node.stop(); if l.engine.isRunning { l.engine.pause() } }
@@ -309,7 +328,7 @@ final class Player: ObservableObject {
     }
     private func advance() {
         if let u = until, Date() >= u { NSLog("[Room] until reached"); until = nil; stop(); return }
-        play(index + 1)
+        play(following())
     }
     private func everyQuarter() {
         if playing, let node = lanes.first?.node, let t = node.lastRenderTime, let p = node.playerTime(forNodeTime: t), p.sampleRate > 0 {

@@ -155,6 +155,9 @@ struct Root: View {
             TopRow()
             Hairline()
             VizView(viz: viz).frame(minHeight: 220)
+                // a click on the picture = the next visualization (same as VISUAL ›); a transparent layer, since the web view eats clicks
+                .overlay(Color.clear.contentShape(Rectangle()).onTapGesture { viz.next() }
+                    .axButton("Next visualization", id: "visual-click") { viz.next() })
             Hairline()
             controls.padding(.horizontal, 18).padding(.vertical, 12)
         }
@@ -174,8 +177,18 @@ struct Root: View {
                 Text("NEXT").font(.system(size: 14, weight: .bold, design: .monospaced)).foregroundStyle(Ink.text)
                     .word("Next", id: "next") { player.next() }
                 Text("\(player.index + 1) / \(TRACKS.count)").font(.system(size: 13, design: .monospaced)).foregroundStyle(Ink.dim)
-                Text(player.track.title).font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Ink.rainbow[player.index % Ink.rainbow.count]).fixedSize()
+                HStack(spacing: 6) {
+                    Text(player.track.element).font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Ink.rainbow[player.index % Ink.rainbow.count])
+                    if !player.track.style.isEmpty {
+                        Text("·").foregroundStyle(Ink.dim)
+                        // a click switches Indian Raga <-> Mantra Voice (same element), the loop keeps that style
+                        Text(player.track.style.uppercased()).font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Ink.rainbow[player.index % Ink.rainbow.count])
+                            .word(player.track.style == "Mantra Voice" ? "Switch to Indian Raga" : "Switch to Mantra Voice", id: "style-toggle",
+                                  value: player.track.style) { player.toggleStyle() }
+                    }
+                }.fixedSize()
                 Spacer(minLength: 8)
                 Text("\(clock(player.pos)) / \(clock(player.dur))").font(.system(size: 13, design: .monospaced)).foregroundStyle(Ink.dim)
             }

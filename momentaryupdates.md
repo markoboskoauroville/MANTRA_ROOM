@@ -185,3 +185,15 @@ Reading (master): "two times" = two titles. The app's own bold "Meditation Room 
 > please update the app also that it can output the sound through multiple outputs, not only through one
 
 Reading (master): OUTPUT becomes a set of ticked devices (one engine per device, same file, started on the same host time); GAIN stays global; the choice is saved; --output may be repeated. The Mac's default output is never changed. Shipped as Mac v4 (v3 was already building).
+
+## Request 38 (15.11.2026): a click on the visualization goes to the next one
+
+> please add the feature to meditation room: when I click on the visualization itself, it goes to the next visualization
+
+Reading (master): one click anywhere on the picture = the VISUAL "›"; a transparent layer over the web view, an AX button "Next visualization"; a drag does not fire it (no double-click action exists in the window).
+
+## Request 39 (15.11.2026): clicking Indian Raga changes it to Mantra Voice and back
+
+> also, clicking on Indian raga changes it to mantra voice and vice versa
+
+Reading (master): both exist as the two styles of each element (Earth, Water, Fire, Air, Ether, OM: -voice and -raga files). The style word beside the track name is now a button: it switches to the other style of the same element from the start, and the loop then keeps that style (saved, styleLock). The guide has no style, so no button. Shipped with the click-on-visual and multiple outputs as Mac v5 (v4 was already built).

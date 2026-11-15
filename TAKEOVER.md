@@ -264,3 +264,5 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
   the first lane; GAIN is global; saved in UserDefaults "outputs"; `--output` may repeat; door: `outputs` arg of play-loop,
   action `outputs-on`, state `outputs_on`. UI: row OUTPUTS, each device an AX button "● name" (Flow layout wraps).
   Sync is as good as the devices' own latency (a Bluetooth speaker will lag); real listening on several devices is Marko's.
+- Mac v4 also: a click on the visualization = next visualization (Request 38), AX button visual-click.
+- **Mac v5**: the style word (INDIAN RAGA / MANTRA VOICE) is an AX button style-toggle; styleLock saved in UserDefaults.
