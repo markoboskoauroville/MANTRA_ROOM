@@ -62,3 +62,15 @@
   full screen and the TOP toggle, and blanks the title text field; mac/check_one_title.sh fails the workflow otherwise.
   Rule: MANTRA_MANIFEST modules/one-title-only.md.
 - Bump VERSION with python or sed -i '' (BSD sed): after v3 to v5 shipped as 'v3', always grep the line before pushing.
+
+## The Linux version on chromium-vm (15.11.2026)
+- butterchurn in headless Chromium (SwiftShader, no GPU) on 2 Ampere cores: 2.7 fps at 720p. A CPU-only VM gets an
+  ffmpeg picture (avectorscope mirrored with hflip/vflip + blend lighten = a mandala, gradients scaled up from 160x90).
+- Compose at 640x360 and scale up; draw the text after the scale so it stays sharp. 20 s of stream rendered in 10.9 s.
+- An infinite source (gradients) keeps ffmpeg running past `-t` on the input: give `shortest=1` to the blend.
+- drawtext `textfile` + `reload`: a file that DISAPPEARS kills ffmpeg ("Error while filtering"); write with tmp + rename.
+  An EMPTY file is fine (draws nothing); a single space with `box=1` draws an empty dark box.
+- Ubuntu's ffmpeg 6.1 drawtext does not shape Devanagari (conjuncts as boxes, spaces lost); NotoSansDevanagari has no Latin.
+- Escape text in the filter graph through files (textfile), not `text='...'`: the quoting ate a letter of "stream".
+- A private MediaMTX next to the public relay: switch `moq: false`, or it opens :8892/:8893 on every interface.
+- MediaMTX HLS answers the first request with 302 ?cookieCheck=1: `curl -L`.

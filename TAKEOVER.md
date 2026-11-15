@@ -278,3 +278,34 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
 - **Mac v13**: melting text (Captions.swift + web/textfx.js), PRE-SHOW (countdown + preshow/cards.json), /api/text, DUCK (12 dB below the GAIN while the voice speaks). v12 measured: window steady, NDI 25.2 fps, UYVY.
 - **Mac v15**: the melting text was invisible in v13/v14: the title texture needs generateMipmap + LINEAR_MIPMAP_LINEAR (butterchurn's own), found with a headless Chrome test page (scratch tt.html). Lesson: prove a WebGL feature in a headless page before shipping it.
 - **Mac v16**: the melting text has a dark rim (readable on a white flash).
+
+## The Linux version: Meditation Room (Linux) on chromium-vm, the test stream that spends no SIM (15.11.2026, Request 44)
+
+Marko: "make the Linux version of this meditation room and install it on a virtual machine as a test stream ... so I don't
+spend my SIM card." Folder `linux/`, installed on chromium-vm by `bash ~/MANTRA_ROOM/linux/install.sh` (the VM's own sparse
+clone of this public repo: audio, linux, preshow; nothing from the Mac). Units are NOT enabled at boot, no timer.
+
+- **Sound**: the Mac app's thirteen tracks in its order (the guide, then Earth/Water/Fire/Air/Ether/OM, Mantra Voice and
+  Indian Raga each), decoded one after another into one PCM stream paced by Python (20 ms chunks, 0.25 s lead), looping.
+- **Picture** (ffmpeg only, no GPU): the stereo picture of the sound (avectorscope lissajous) mirrored four ways = a
+  mandala, over a slow four-colour gradient, composed at 640x360 and scaled to 1280x720 25p; title, clock (Zagreb), the
+  track bottom left. Text over it: `mrlinux text "..."` (centred, `\n` for lines). PRE-SHOW: `mrlinux preshow HH:MM`
+  (or `start --preshow-until HH:MM`) = "N minutes until the live stream" + a teaching card from `preshow/cards.json`
+  (shared with the Mac app) every 60 s of stream time, 16 s visible, fading in and out and drifting up slowly. The
+  Devanagari line of a card is not drawn (Ubuntu's ffmpeg cannot shape it).
+- **Why not butterchurn**: headless Chromium with SwiftShader on the VM's 2 Ampere cores drew butterchurn at 2.7 fps
+  (720p, 15.11.2026). The ffmpeg picture costs ~0.5-0.7 of one core with the H.264 encode.
+- **Encode**: H.264 baseline veryfast zerolatency, no B-frames, GOP 2 s, 2.5 Mbit/s + Opus 128k 48 kHz, MPEG-TS by SRT.
+- **Where it goes**: `meditation-room-linux.service` (user ubuntu, CPUQuota 120 %) publishes ONLY to the private test relay
+  `mrlinux-relay.service` (own MediaMTX, config linux/mrlinux-relay.yml: SRT 127.0.0.1:8991 path vmtest, API
+  127.0.0.1:9996, LL-HLS on the Tailscale address http://100.102.86.30:8987/vmtest/index.m3u8). The public Santoshi relay
+  and its config are never touched.
+- **Go live** (`mrlinux go-live [min]`, default 5, max 30): `mrlinux-live.service` (root) refuses between 11:50 and 13:50
+  Zagreb (the noon replay), while the site is live, while relay path santoshi has a publisher, or while vmtest is not
+  running; otherwise copies vmtest to santoshi (-c copy, SRT 8890 with /etc/santoshi-relay/key), waits for the path, then
+  GO on the site as paired camera "VM Test" (via relay). It stops itself after the minutes or at 11:50; STOP on the site
+  first, then the copy; ExecStopPost stops the site again if the live is still "VM Test". `mrlinux stop-live` ends it.
+- **Site token**: `/etc/meditation-room-linux/site-token` (root 600), made by install.sh; only its sha256 is shown. It is a
+  camera token like /admin > PAIR CAMERA makes: either KV `camtoken:<sha256>` = {name:"VM Test",created,hash}, or
+  Marko presses PAIR CAMERA "VM Test" and the shown token replaces the file's content.
+- Commands: `mrlinux start|stop|status|go-live [min]|stop-live|text "..."|text --clear|preshow HH:MM|preshow --off|checks`.
