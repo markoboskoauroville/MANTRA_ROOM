@@ -219,3 +219,9 @@ Reading (master): the Mac app sends its picture and its sound as an NDI source "
 > the room is not showing. Please debug it. Find the reason ... This is the final test. I want to see in this NDI video monitor streams from my phone, streams from my meditation application, etc.
 
 Reading (master): debugged with an own receiver (frames arrive: 1280x720 BGRA, 25 fps, real picture) and with NDI Video Monitor driven through its menu: the Monitor lists the source as "Meditation Room" and the official Test Patterns shows, but ours stays black. The nested parentheses in the source name "Meditation Room (Mantra)" are the suspect; v10 names the source "Meditation Room".
+
+## Request 44 (15.11.2026): the Linux Meditation Room on the VM, a test stream that spends no SIM
+
+> please make the Linux version of this meditation room and install it on a virtual machine as a test stream. This will be a test stream picture and audio, so I don't spend my SIM card. Everything can now be tested through the Linux machine streaming directly to the Video Ninja on my Santosh page, and writing over it. Everything that needs to be written will be done that way, so we are not spending our internet. We have a simple way to test things with this NDI app. Let's do that. Please go install this in the virtual machine and convert the code to something which Linux can run
+
+Reading (worker): `meditation-room-linux` in linux/, on chromium-vm: the meditation tracks + a visual, 1280x720 25p, published to the Santoshi live path as its own paired camera "VM Test"; `mrlinux start|stop|status|go-live|stop-live`, not at boot.
