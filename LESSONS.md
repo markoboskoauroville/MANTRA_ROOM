@@ -61,3 +61,4 @@
   peeked out behind the transparent title bar in later states. Now enforceOneTitle() runs at creation and on key, resize,
   full screen and the TOP toggle, and blanks the title text field; mac/check_one_title.sh fails the workflow otherwise.
   Rule: MANTRA_MANIFEST modules/one-title-only.md.
+- Bump VERSION with python or sed -i '' (BSD sed): after v3 to v5 shipped as 'v3', always grep the line before pushing.
