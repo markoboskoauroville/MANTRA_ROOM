@@ -28,9 +28,9 @@ final class NDISender: ObservableObject {
     weak var viz: Viz?
 
     private typealias FInit = @convention(c) () -> Bool
-    private typealias FCreate = @convention(c) (UnsafePointer<NDISendCreate>) -> UnsafeMutableRawPointer?
-    private typealias FVideo = @convention(c) (UnsafeMutableRawPointer, UnsafePointer<NDIVideoFrame>) -> Void
-    private typealias FAudio = @convention(c) (UnsafeMutableRawPointer, UnsafePointer<NDIAudioFrame>) -> Void
+    private typealias FCreate = @convention(c) (UnsafeRawPointer) -> UnsafeMutableRawPointer?
+    private typealias FVideo = @convention(c) (UnsafeMutableRawPointer, UnsafeRawPointer) -> Void
+    private typealias FAudio = @convention(c) (UnsafeMutableRawPointer, UnsafeRawPointer) -> Void
     private typealias FDestroy = @convention(c) (UnsafeMutableRawPointer) -> Void
     private var fCreate: FCreate?, fVideo: FVideo?, fAudio: FAudio?, fDestroy: FDestroy?
     private var loaded = false
@@ -66,7 +66,7 @@ final class NDISender: ObservableObject {
             var s: UnsafeMutableRawPointer?
             NDISender.sourceName.withCString { n in
                 var c = NDISendCreate(p_ndi_name: n, p_groups: nil, clock_video: false, clock_audio: false)
-                s = fCreate?(&c)
+                s = withUnsafePointer(to: &c) { self.fCreate?(UnsafeRawPointer($0)) }
             }
             guard let made = s else { note = "NDI could not start the source"; return }
             sender = made; gen += 1; on = true; note = ""
@@ -116,7 +116,7 @@ final class NDISender: ObservableObject {
                                        picture_aspect_ratio: Float(w) / Float(h), frame_format_type: 1,
                                        timecode: Int64.max, p_data: raw.baseAddress?.assumingMemoryBound(to: UInt8.self),
                                        line_stride_in_bytes: Int32(stride), p_metadata: nil, timestamp: 0)
-                f(s, &fr)
+                withUnsafePointer(to: &fr) { f(s, UnsafeRawPointer($0)) }
             }
         }
     }
@@ -134,7 +134,7 @@ final class NDISender: ObservableObject {
             data.withUnsafeMutableBufferPointer { p in
                 var fr = NDIAudioFrame(sample_rate: rate, no_channels: 2, no_samples: Int32(n), timecode: Int64.max,
                                        p_data: p.baseAddress, channel_stride_in_bytes: Int32(n * 4), p_metadata: nil, timestamp: 0)
-                f(s, &fr)
+                withUnsafePointer(to: &fr) { f(s, UnsafeRawPointer($0)) }
             }
         }
     }
