@@ -22,6 +22,7 @@ them, in step with the audio by timestamps. Cost: decoding one 720p clip (two du
 
   mrvisuals.py styles [--secs 75]      render the ffmpeg styles into the library (fast, minutes)
   mrvisuals.py status                  the library
+  mrvisuals.py grade                   measure each clip's brightness, store its grade (mean luma <= MRV_LUMA_CAP 0.40)
   mrvisuals.py preview <out.mp4> [--secs 120] [--preshow HH:MM] [--poster every,for,image]   the player + text alone into a file (a test, no stream)
 
 Library: $MRV_LIB (default ~ubuntu/mrvisuals/clips), shared with milkrender.py. Switch: ~/.cache/mrlinux/visuals
@@ -53,6 +54,14 @@ XF = int(float(os.environ.get("MRV_XFADE", "1.0")) * FPS)   # cross-fade frames
 # Marko, 15.11.2026: "Let it, just every, thirty seconds show different visualization." Each clip plays a random stretch of
 # SWITCH seconds (the whole clip if shorter), then the next one; 0 = whole clips.
 SWITCH = float(os.environ.get("MRV_SWITCH", "30"))
+HALO = float(os.environ.get("MRV_HALO", "0.55"))          # opacity of the dark halo behind the text
+# Marko's review 15.11.2026 (via the master): a blown-out white preset is not meditative. Every clip is measured (mean luma,
+# 0..1 of the video range) and graded at decode: a gamma (highlights stay, mids sink) and if needed a gain, so its mean
+# sits at or under LUMA_CAP. Stored as "grade" {g, k, luma, luma_after} in the clip's json (mrvisuals.py grade).
+LUMA_CAP = float(os.environ.get("MRV_LUMA_CAP", "0.40"))
+# a clip brighter than this on average is mostly white: darkened it turns flat grey, so it is left out (kept on disk and in
+# the json, so the night job does not render it again)
+LUMA_DROP = float(os.environ.get("MRV_LUMA_DROP", "0.65"))
 POSTER_FADE = float(os.environ.get("MRV_POSTER_FADE", "2.0"))   # the poster fades in and out over the visuals
 FONTS = [os.environ.get("MRV_FONT", ""), "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
@@ -90,7 +99,7 @@ def library(lib=LIB):
 
 def playable(lib=LIB):
     """MilkDrop clips; the ffmpeg styles too while there are fewer than MIN_MILK MilkDrop clips."""
-    clips = library(lib)
+    clips = [c for c in library(lib) if not (c.get("grade") or {}).get("drop")]
     milk = [c for c in clips if c.get("kind") == "milkdrop"]
     return milk if len(milk) >= MIN_MILK else clips
 
@@ -115,6 +124,50 @@ class Bag:
         return c
 
 
+def grade_filter(clip):
+    g = clip.get("grade") or {}
+    gm, k = float(g.get("g", 1.0)), float(g.get("k", 1.0))
+    if gm == 1.0 and k >= 0.999:
+        return ""
+    return f",lutyuv=y='clip(16+219*{k:.3f}*pow(max(val-16\\,0)/219\\,{gm:.2f})\\,16\\,235)'"
+
+
+def measure(path):
+    """Luma samples (0..1 of 16-235) of the clip's keyframes (one every 2 s; only those are decoded: light), at 160x90."""
+    raw = subprocess.run(["nice", "-n", "19", "ffmpeg", "-nostdin", "-v", "error", "-skip_frame", "nokey", "-i", path,
+                          "-vf", "scale=160:90,format=gray", "-fps_mode", "passthrough", "-f", "rawvideo", "pipe:1"],
+                         capture_output=True).stdout
+    y = np.frombuffer(raw, np.uint8).astype(np.float32)
+    return np.clip((y - 16) / 219, 0, 1)
+
+
+def grade_of(x, cap=LUMA_CAP):
+    """The mildest grade that brings the mean to <= cap: gamma first (1 .. 2.2), then a gain."""
+    m = float(x.mean()) if x.size else 0.0
+    if m <= cap:
+        return {"g": 1.0, "k": 1.0, "luma": round(m, 3), "luma_after": round(m, 3)}
+    for gm in (1.2, 1.4, 1.6, 1.8, 2.0, 2.2):
+        ma = float(np.power(x, gm).mean())
+        if ma <= cap:
+            return {"g": gm, "k": 1.0, "luma": round(m, 3), "luma_after": round(ma, 3)}
+    k = cap / ma
+    return {"g": 2.2, "k": round(k, 3), "luma": round(m, 3), "luma_after": round(cap, 3)}
+
+
+def grade_clip(path_json, force=False):
+    m = json.load(open(path_json))
+    if m.get("grade") and not force and m["grade"].get("cap") == LUMA_CAP and "drop" in m["grade"]:
+        return m["grade"]
+    g = grade_of(measure(path_json[:-5] + ".mp4"))
+    g["cap"] = LUMA_CAP
+    g["drop"] = g["luma"] > LUMA_DROP
+    m["grade"] = g
+    with open(path_json + ".tmp", "w") as f:
+        json.dump(m, f, indent=1)
+    os.replace(path_json + ".tmp", path_json)
+    return g
+
+
 class Decoder:
     def __init__(self, clip, switch=None):
         self.clip, self.pos = clip, 0
@@ -129,7 +182,8 @@ class Decoder:
         self.start = start / FPS
         self.p = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-threads", "1", "-ss", f"{self.start:.2f}",
                                    "-i", clip["path"], "-an",
-                                   "-vf", f"scale={W}:{H},fps={FPS},format=yuv420p", "-f", "rawvideo", "pipe:1"],
+                                   "-vf", f"scale={W}:{H},fps={FPS},format=yuv420p{grade_filter(clip)}", "-f", "rawvideo",
+                                   "pipe:1"],
                                   stdout=subprocess.PIPE, bufsize=0)
 
     def read(self):
@@ -216,7 +270,7 @@ class Block:
         lines = lines[:4]
         lh = round(fs * 1.28)
         stroke = max(2, round(fs / 8))
-        pad = 40
+        pad = 56                       # room for the soft dark halo
         bw = int(max(d.textlength(l, font=f) for l in lines) + 2 * stroke + 2 * pad)
         bh = int(lh * len(lines) + 2 * stroke + 2 * pad)
         bw += bw % 2
@@ -227,12 +281,19 @@ class Block:
             x = (bw - d.textlength(l, font=f)) / 2
             y = pad + stroke + i * lh + (lh - fs) / 2 - fs * 0.12
             dr.text((x, y), l, font=f, fill=(255, 255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0, 230))
+        # a soft dark halo under the letters (the text reads on a bright frame too): the text's shape widened and blurred,
+        # black at HALO opacity; the text is laid over it
+        ha = rgba.getchannel("A").filter(ImageFilter.MaxFilter(15)).filter(ImageFilter.GaussianBlur(18))
+        halo = np.asarray(ha, np.float32) / 255.0 * HALO
         self.levels = []
         for r in self.BLURS:
             im = rgba.filter(ImageFilter.GaussianBlur(r)) if r else rgba
             a = np.asarray(im, np.float32)
             luma = (0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]) / 255.0
-            self.levels.append((16.0 + 219.0 * luma, a[..., 3] / 255.0))
+            at = a[..., 3] / 255.0
+            A = at + halo * (1 - at)                       # text over the black halo
+            L = np.where(A > 1e-4, (luma * at) / np.maximum(A, 1e-4), 0.0)
+            self.levels.append((16.0 + 219.0 * L, A))
         self.bw, self.bh = bw, bh
         self.x0, self.y0 = (W - bw) // 2 & ~1, (H - bh) // 2 & ~1
 
@@ -581,7 +642,7 @@ def render_styles(lib=LIB, secs=75, only=None):
         with open(out + ".json.tmp", "w") as f:
             json.dump(meta, f, indent=1)
         os.replace(out + ".json.tmp", out + ".json")
-        log(f"style {key}: {secs} s in {took:.0f} s, {meta['bytes'] / 1e6:.1f} MB")
+        log(f"style {key}: {secs} s in {took:.0f} s, {meta['bytes'] / 1e6:.1f} MB, grade {grade_clip(out + '.json')}")
 
 
 def preview(path, secs=120, preshow=None, lib=LIB, poster=None):
@@ -621,7 +682,7 @@ def preview(path, secs=120, preshow=None, lib=LIB, poster=None):
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["styles", "status", "preview"])
+    ap.add_argument("cmd", choices=["styles", "status", "preview", "grade"])
     ap.add_argument("out", nargs="?")
     ap.add_argument("--secs", type=float, default=75)
     ap.add_argument("--only", nargs="*")
@@ -638,5 +699,10 @@ if __name__ == "__main__":
               f"playing {'MilkDrop only' if mk >= MIN_MILK else 'all (MilkDrop < %d)' % MIN_MILK}")
         for c in cl:
             print(f"  {c.get('kind'):8s} {c.get('name')!s:40.40s} {c.get('secs')} s")
+    elif a.cmd == "grade":       # measure every clip's brightness and store its grade (once per clip and cap)
+        for c in library(a.lib):
+            g = grade_clip(c["path"][:-4] + ".json", force=bool(a.only))
+            print(f"  {c.get('name')!s:34.34s} luma {g['luma']:.2f} -> {g['luma_after']:.2f}  (gamma {g['g']}, gain {g['k']})"
+                  + ("  LEFT OUT (mostly white)" if g.get("drop") else ""))
     elif a.cmd == "preview":
         preview(a.out or "/tmp/mrvisuals-preview.mp4", a.secs, a.preshow, a.lib, a.poster)

@@ -395,3 +395,9 @@ The VM cannot draw MilkDrop live, so the presets are drawn OFFLINE into clips an
   (~/mrbuftest/soak/rec.ts on the VM, 4.4 min, kept), and whether CPUWeight 400 is enough. Not switched on in production
   (`mrbuffer status` = direct). Earlier 100 s functional test (10:42, capped at 90 % of one core): ran dry by design,
   fillers joined with no audio gap > 60 ms, the clock showed the playout time.
+- **Calm brightness and readable text** (review 15.11.2026: Stained glass was blown-out white with black shards): every clip's
+  mean luma is measured on its keyframes and stored as `grade` in its json (`mrvisuals.py grade`, also after every render);
+  the player decodes it through a gamma (1.2-2.2, then a gain) so the mean sits <= MRV_LUMA_CAP 0.40; a clip brighter than
+  MRV_LUMA_DROP 0.65 (mostly white, greys out when darkened) is left out. 15.11.2026: Stained glass 0.83 left out; Spiral
+  0.47, Castle 0.46, Mandala 0.42, Lotus 0.40 graded; Angel flight 0.03 (very dark, kept). The text block has a soft dark
+  halo (the letters widened 15 px, blurred 18 px, black at MRV_HALO 0.55) so it reads on bright frames.

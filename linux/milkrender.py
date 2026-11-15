@@ -281,6 +281,12 @@ def render(key, out_dir=LIB, secs=75, size="1280x720", track=None, start=None, c
         json.dump(meta, f, indent=1)
     os.replace(base + ".json.tmp", base + ".json")
     log(f"  done {name_of(key)!r}: {frames} frames in {took:.0f} s = {meta['render_fps']} fps, {meta['bytes'] / 1e6:.1f} MB")
+    try:   # the brightness grade the player applies (a blown-out white preset sinks to a calm range)
+        sys.path.insert(0, HERE)
+        import mrvisuals
+        log(f"  grade {mrvisuals.grade_clip(base + '.json')}")
+    except Exception as e:
+        log(f"  grade failed: {e}")
     return meta
 
 
