@@ -173,3 +173,9 @@ Also 10.11.2026, through the master: Suno song number 6, "Classical Om" from Yog
 > I'm saying both, pattern and meditation.
 
 Reading (master): the meditation visuals on the keys with the liveness counter (F1-F6 binary seconds, ESC green/red) in every frame, and one of G815 Lights' ten patterns for 20 s every 5 minutes; lights mode meditation | patterns | both, default both.
+
+## Request 36 (15.11.2026): the title is shown twice in the Mac window (the bug came back)
+
+> again, the bug I saw before in the meditation room has two times. One is echoing at the top. Take a screenshot, and please don't repeat this bug in the future. Don't repeat this bug
+
+Reading (master): "two times" = two titles. The app's own bold "Meditation Room (Mantra)" is drawn over the system window title, whose faded copy peeks out behind it. One title only, on every state of the window, and a guard in the workflow so it cannot return.
