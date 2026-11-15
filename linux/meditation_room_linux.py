@@ -15,7 +15,7 @@ Marko, 15.11.2026: "make the Linux version of this meditation room and install i
          on every exit the site gets STOP first.
   status the numbers (speed, fps, bitrate, track) as JSON.
 
-Files: ~/.cache/mrlinux/{status.json,text.txt,now.txt,count.txt,preshow}. Site token: /etc/meditation-room-linux/site-token
+Files: ~/.cache/mrlinux/{status.json,text.txt,now.txt,count.txt,card.txt,preshow}. Site token: /etc/meditation-room-linux/site-token
 (root 600, never printed). Relay key: /etc/santoshi-relay/key (root:ubuntu 640, never printed).
 """
 import datetime as dt
@@ -41,6 +41,8 @@ PUBLIC_KEY = "/etc/santoshi-relay/key"
 SITE = "https://santoshi-band.pages.dev/api/live"
 SITE_TOKEN = "/etc/meditation-room-linux/site-token"
 ZAGREB = ZoneInfo("Europe/Zagreb")
+CARDS = os.environ.get("MRL_CARDS", HOME + "/MANTRA_ROOM/preshow/cards.json")  # shared with the Mac app (v13+)
+CARD_P, CARD_ON = 60, 16   # a card every 60 s of stream time, visible 16 s
 NOON = (dt.time(11, 50), dt.time(13, 50))   # the noon replay owns the site (CLOUD MIXER show)
 
 ELEMENTS = [("earth", "Earth · A"), ("water", "Water · U"), ("fire", "Fire · I"), ("air", "Air · O"),
@@ -66,7 +68,7 @@ def graph():
     f = esc(FONT)
     # the mandala: the stereo picture of the sound (lissajous), mirrored left-right and up-down, softened, warm gold
     scope = ("[av]aformat=channel_layouts=stereo,avectorscope=s=320x320:r=25:mode=lissajous:draw=line:scale=sqrt:zoom=0.9:"
-             "rc=230:gc=170:bc=80:ac=200:rf=30:gf=34:bf=40:af=20,format=gbrp,split=2[s1][s2];[s2]hflip[s2f];"
+             "rc=200:gc=150:bc=70:ac=170:rf=30:gf=34:bf=40:af=20,format=gbrp,split=2[s1][s2];[s2]hflip[s2f];"
              "[s1][s2f]blend=all_mode=lighten,split=2[m1][m2];[m2]vflip[m2f];[m1][m2f]blend=all_mode=lighten,"
              "gblur=sigma=1.0,pad=640:360:160:20:black[scope]")
     bg = ("gradients=s=160x90:r=25:c0=0x1a0b2e:c1=0x3d1a0a:c2=0x0a2a2a:c3=0x2a0a1e:nb_colors=4:speed=0.003,"
@@ -77,8 +79,13 @@ def graph():
            f"drawtext=fontfile={f}:textfile='{t('now.txt')}':reload=25:x=40:y=h-60:fontsize=24:fontcolor=white@0.6,"
            f"drawtext=fontfile={f}:textfile='{t('count.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.18:fontsize=44:fontcolor=white@0.9:"
            "shadowcolor=black@0.6:shadowx=2:shadowy=2,"
+           # the teaching card: fades in 2.5 s, stays, fades out 2.5 s, drifts up a little (a slow 'melt'), every CARD_P s
+           f"drawtext=fontfile={f}:textfile='{t('card.txt')}':reload=25:text_align=C:x=(w-tw)/2:"
+           f"y=h*0.40-(mod(t\\,{CARD_P})*1.2):fontsize=40:line_spacing=12:fontcolor=white:box=1:boxcolor=black@0.38:boxborderw=22:"
+           f"alpha='if(lt(mod(t\\,{CARD_P})\\,2.5)\\,mod(t\\,{CARD_P})/2.5\\,if(lt(mod(t\\,{CARD_P})\\,{CARD_ON-2.5})\\,1\\,"
+           f"if(lt(mod(t\\,{CARD_P})\\,{CARD_ON})\\,({CARD_ON}-mod(t\\,{CARD_P}))/2.5\\,0)))',"
            f"drawtext=fontfile={f}:textfile='{t('text.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.72:fontsize=48:fontcolor=white:"
-           "shadowcolor=black@0.7:shadowx=3:shadowy=3:line_spacing=10[vout]")
+           "box=1:boxcolor=black@0.38:boxborderw=20:line_spacing=10[vout]")
     return f"[0:a]asplit=2[aout][av];{scope};{bg};{out}"
 
 
@@ -140,8 +147,50 @@ def preshow_loop(stop):
         stop.wait(5)
 
 
+STREAM_T = [0.0]   # seconds of sound sent to the current encoder = drawtext's t
+
+
+def preshow_on():
+    try:
+        hhmm = open(CACHE + "/preshow").read().strip()
+        h, m = map(int, hhmm.split(":"))
+        now = dt.datetime.now(ZAGREB)
+        return now < now.replace(hour=h, minute=m, second=0, microsecond=0)
+    except Exception:
+        return False
+
+
+def card_loop(stop):
+    import random
+    order, last_cycle = [], -1
+    while not stop.is_set():
+        st = STREAM_T[0]
+        cycle, phase = int(st // CARD_P), st % CARD_P
+        if CARD_ON + 4 < phase < CARD_P - 4 and cycle != last_cycle:
+            last_cycle = cycle
+            line = ""
+            if preshow_on():
+                try:
+                    cards = json.load(open(CARDS)).get("cards", [])
+                except Exception:
+                    cards = []
+                if cards:
+                    if not order:
+                        order = random.sample(range(len(cards)), len(cards))
+                    c = cards[order.pop() % len(cards)]
+                    line = "\n".join(x for x in (c.get("title", ""), c.get("sanskrit", ""), wrap(c.get("text", ""), 46)) if x)
+            wfile(CACHE + "/card.txt", line)
+        stop.wait(1)
+
+
+def wrap(text, width):
+    import textwrap
+    return "\n".join(textwrap.wrap(text, width))
+
+
 def run():
     os.makedirs(CACHE, exist_ok=True)
+    wfile(CACHE + "/card.txt", "")
     for n in ("text.txt", "now.txt", "count.txt"):
         if not os.path.exists(f"{CACHE}/{n}"):
             wfile(f"{CACHE}/{n}", "")
@@ -149,6 +198,7 @@ def run():
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     threading.Thread(target=preshow_loop, args=(stop,), daemon=True).start()
+    threading.Thread(target=card_loop, args=(stop,), daemon=True).start()
     chunk = SR * CH * 2 // 50          # 20 ms of PCM
     lead = 0.25                        # keep the encoder a quarter second ahead, never more
     i = 0
@@ -156,6 +206,7 @@ def run():
         enc = Encoder(LOCAL_SRT)
         enc.start()
         t0, sent = time.monotonic(), 0
+        STREAM_T[0] = 0.0
         try:
             while not stop.is_set() and enc.proc.poll() is None:
                 fname, title = TRACKS[i % len(TRACKS)]
@@ -177,6 +228,7 @@ def run():
                         time.sleep(ahead - lead)
                     enc.proc.stdin.write(buf)
                     sent += len(buf)
+                    STREAM_T[0] = sent / (SR * CH * 2)
                 dec.kill()
                 dec.wait()
         except (BrokenPipeError, OSError) as e:
