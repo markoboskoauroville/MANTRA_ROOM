@@ -43,6 +43,8 @@ window.TextFX = (function () {
       ctx.fillStyle = "#FFFFFF"; ctx.textBaseline = "middle";
       lines.forEach(function (l, i) {
         const w = ctx.measureText(l).width;
+        ctx.lineJoin = "round"; ctx.lineWidth = fs / 8; ctx.strokeStyle = "rgba(0,0,0,0.9)";   // a dark rim: readable on a white flash too
+        ctx.strokeText(l, (W - w) / 2, y0 + i * lh);
         ctx.fillText(l, (W - w) / 2, y0 + i * lh);
       });
       const px = new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer);

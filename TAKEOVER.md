@@ -277,3 +277,4 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
 - **Mac v12**: flicker fixed (NDI picture grabbed inside the page, no takeSnapshot), control rows wrap by whole cells; web/textfx.js + preshow/cards.json + web/lines/guide.mp3.json bundled (the Swift side of the text comes in v13).
 - **Mac v13**: melting text (Captions.swift + web/textfx.js), PRE-SHOW (countdown + preshow/cards.json), /api/text, DUCK (12 dB below the GAIN while the voice speaks). v12 measured: window steady, NDI 25.2 fps, UYVY.
 - **Mac v15**: the melting text was invisible in v13/v14: the title texture needs generateMipmap + LINEAR_MIPMAP_LINEAR (butterchurn's own), found with a headless Chrome test page (scratch tt.html). Lesson: prove a WebGL feature in a headless page before shipping it.
+- **Mac v16**: the melting text has a dark rim (readable on a white flash).
