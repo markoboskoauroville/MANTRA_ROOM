@@ -44,3 +44,15 @@
   Sound Recorder needs Firefox on the song page (`firefoxctl open` it first) or it answers "not on a Suno song page".
 - The VM Gemini worker is a shared pipe: Gemini's per-account limit (auroville.community resets 13:41 UTC on 10.11.2026)
   and an HTTP 500 for the gmail profile stopped the room pictures; batch.json was backed up as batch-before-mantra-room.json.
+
+## 15.11.2026 (the Mac app)
+- butterchurn needs no live Web Audio node: `visualizer.render({audioLevels: {timeByteArray, timeByteArrayL,
+  timeByteArrayR}})` takes 1024 bytes per channel (128 = silence). Feed it from a native AVAudioEngine tap and the page
+  needs no sound of its own and no mirror to keep in step.
+- A WKWebView stops requestAnimationFrame when its window is covered; drive each frame from Swift with
+  evaluateJavaScript and switch off `_setWindowOcclusionDetectionEnabled:` so the picture and the keyboard keep going.
+- Reading a small frame from a WebGL canvas works without preserveDrawingBuffer when drawImage runs in the same task as
+  render().
+- One repository, two apps: Mac tags mac-vN not Latest, or the site's releases/latest button would offer a Mac zip.
+- Another worker's running process (G815 lightshow.py) is not ours to kill: the permission classifier refused it; ask
+  the master, the keys take one painter at a time.

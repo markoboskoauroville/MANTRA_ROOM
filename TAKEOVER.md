@@ -208,3 +208,43 @@ out-breath (sine easing); the home timer ends the session with the bowl bell; th
   amazon.de SEARCH links because amazon.de refused automated fetches (no ASIN or Amazon's Choice badge could be seen).
   To publish: Marko registers the site (or `partnernet-add https://mantraroom.pages.dev`), then swap each link for /dp/ASIN?tag=,
   check the badge on amazon.de that day, remove `hidden`, run tools/build_site.py.
+
+## The Mac app: Meditation Room (Mantra), folder mac/ (15.11.2026, Request 34)
+
+Marko: *"Convert it to Swift and then we have the same meditation app in my Mac ... publish it as a Mac app, Meditation
+1 ... enable control of the keyboard with the visualization from the meditation app."* "Meditation 1" = version 1.
+
+- **What**: `/Applications/Meditation Room (Mantra).app`, bundle `community.auroville.meditationroom`, VERSION in
+  `mac/app/App.swift`. Window: house top row (ON OFF · name · v · TOP ✕), the MilkDrop picture, then PLAY LOOP|STOP,
+  NEXT, track n / 13 and title, time, a hairline progress; OUTPUT menu + level hairline, GAIN − +, PEAK dBFS, STOPS AT;
+  KEYBOARD LIGHTS ON/OFF, G815 way · fps · frames, VISUAL ‹ name › AUTO. Every control an AX button, hover highlight.
+- **Sound** (`Player.swift`): AVAudioEngine, the 13 tracks = guide, then earth, water, fire, air, ether, OM each
+  Mantra Voice then Indian Raga, in a loop. The output device is set on the engine's output unit
+  (kAudioOutputUnitProperty_CurrentDevice): BlackHole 2ch for a stream while the ADAM stays the system default.
+  macOS 15 CoreAudio reads the Ogg Opus files directly. Songs are not in the bundle: the repo's own copy
+  (`android/app/src/main/assets/web/audio`) is played on this Mac, elsewhere each file is downloaded once from the
+  public repo (Download Monitor, curl -C -). Peaks of the files: -0.1 (guide) to -6 dBFS; for the stream -5 dB gain
+  gives about -6 to -11 dBFS peaks.
+- **Picture** (`Viz.swift`, `mac/web/index.html`): butterchurn 2.6.7 + presets (copied from the Android assets at
+  build time, one copy) in a WKWebView, the same twelve calm presets first, Auto every 40 s with a 6 s blend. No Metal
+  port: MilkDrop presets are programs (equations + shaders); butterchurn already compiles them all to WebGL.
+  Swift drives it: 60 times a second `room.tick(l, r, gw, gh)` with the last 1024 samples of each channel of the mixer
+  tap (butterchurn's `render({audioLevels})`), so the picture follows exactly what goes to the output; driven from
+  Swift (not requestAnimationFrame) plus `_setWindowOcclusionDetectionEnabled:false` and a ProcessInfo activity, so it
+  keeps going with the window behind other windows.
+- **Keyboard lights** (`Lights.swift`): every second tick (30 fps) the frame comes back shrunk to 24 x 8 (two-step
+  average) as hex RGB, is stretched (brightest channel to ~250) and lifted over the G815's dark floor (~45/255), then
+  goes (1) to G815 Lights' frame API when the app registered as `g815` lists `frame` in `/api`
+  (POST /api/frame {w,h,rgb}), else (2) directly through `G815_LIGHTS/build/g815 serve` with layout.json (each key
+  takes the bilinear colour under its centre, only changed keys sent, all every 2 s). OFF blacks the keys out and
+  leaves them to G815 Lights. Only one painter at a time: tools/lightshow.py of G815_LIGHTS must not run with it.
+- **Door** (`Door.swift`, MANTRA_PORTS id `meditation-room`, 8965, 127.0.0.1 only): GET /health, /api, /api/state;
+  POST /api/play-loop {output, until "HH:MM", lights, gain_db, from}, next, stop, lights {on}, output {name}, outputs,
+  gain {db}, style {to}, status. Also /fn/<action> and ~/.config/star-fns/meditation-room.json for STAR_API.
+  Start options: `open -g -a "Meditation Room (Mantra)" --args --play-loop --output "BlackHole 2ch" --lights --until 11:55 --gain-db -5`.
+- **Build**: `.github/workflows/mac.yml` (template mac-swift.yml, paths mac/**) runs `mac/build.sh` on macos-15.
+  Tags are **mac-vN, not Latest**: the Android vN releases own releases/latest, which the site's buttons and the phone
+  app open. The updater (kits/mac-updater, `tagPrefix = "mac-v"`) looks for the newest mac-v tag.
+- **Install**: `gh release download mac-vN --pattern app.zip`, ditto into /Applications, `codesign --force -s "Mantra Apps"`.
+- **Stands (15.11.2026)**: v1 green first run (43681445210), installed, visual 60 fps; first job: the test stream until
+  11:55 into BlackHole 2ch (Sound Link → Pixel → camera on the keyboard).
