@@ -163,3 +163,7 @@ Also 10.11.2026, through the master: Suno song number 6, "Classical Om" from Yog
 ## Request 33 (10.11.2026): web page link at the end of About
 
 > please in about page of my Chantra Mantra Om Tantra or Chantra Tantra or Toning the Chakras or Mantra Room at the end of about, please put the link to web page of this application
+
+## Request 34 (15.11.2026): the meditation app on the Mac in Swift, its visuals on the keyboard lights, a test stream until 12:00
+
+> Uh go and see my meditation app. Convert it to Swift and then we have the same meditation app in my Mac. And then, you can also while you're building it, also do it uh publish it as a Mac app, Meditation 1. And then, I can enable control of the keyboard with the visualization from the meditation app. So my lights are like a low resolution LED LCD display, displaying whatever the app is showing. ... And then you run this app in the mode of controlling the keyboard lights, and in my camera, I can hear the, I can see the lights of course, visualizations, of course. Also, you need to programmatically change the old tracks from the meditation app one after the other in the loop, and until 12:00, this will be a test stream.
