@@ -251,3 +251,9 @@ Reading (master): butterchurn's own launchSongTitleAnim draws the text INTO the 
 > You can add it, but don't bring it back to zero. If gain is minus 30, then you duck even more
 
 Reading (master): the second line stands. While MANTRA_VOICE says `on` + `phase: playing` (GET :8837/speaking, polled every 250 ms; no new endpoint was needed), every output and the NDI sound sit 12 dB below the GAIN he set (gain -30 gives -42), 300 ms down, 1 s back up to exactly his GAIN, which is never changed. DUCK toggle (AX), default on, saved. Mac v13.
+
+## Request 48 (15.11.2026): the text is too much, too fast
+
+> Please fix the text appearing frequency in the meditation room. It's becoming too fast. It needs to have a slow fade-in with effect, and then show what is the most important, and then slowly fade out. Only one block of text, only 4 or 5 words, and that's all. Understand? It's too much text.
+
+Reading (master): one block at a time, at most 5 words, enforced in web/textfx.js (clip5) for everything (titles, voice, API, cards). Timeline: 3 s fade-in (butterchurn's zoom/wobble settling, driven per frame), 7 s hold, then burned once into the feedback so the preset melts it away; cards wait 90-120 s after a block and 60 s after a track title; voice shows one key phrase per spoken sentence, only into a quiet moment (10 s after the last block). preshow/cards.json rewritten to 5 words or less (single source for the Linux version); the guide's lines file carries a `key` phrase per sentence. Track title = element and style on two lines. Mac v18.
