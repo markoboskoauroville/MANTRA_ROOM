@@ -197,3 +197,9 @@ Reading (master): one click anywhere on the picture = the VISUAL "›"; a transp
 > also, clicking on Indian raga changes it to mantra voice and vice versa
 
 Reading (master): both exist as the two styles of each element (Earth, Water, Fire, Air, Ether, OM: -voice and -raga files). The style word beside the track name is now a button: it switches to the other style of the same element from the start, and the loop then keeps that style (saved, styleLock). The guide has no style, so no button. Shipped with the click-on-visual and multiple outputs as Mac v5 (v4 was already built).
+
+## Request 40 (15.11.2026): an immersive full-screen view
+
+> please add an icon for immersive view full screen. Clicking does change the visualization. Escape is bringing you out of this immersive view
+
+Reading (master): an icon in the title row (AX button "Immersive view") puts the window into native full screen on its own display with the picture alone (controls and title row hidden, cursor hides after 2 s); a click = next visualization; Esc restores the window as it was; sound and lights go on. Mac v6.

@@ -266,3 +266,4 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
   Sync is as good as the devices' own latency (a Bluetooth speaker will lag); real listening on several devices is Marko's.
 - Mac v4 also: a click on the visualization = next visualization (Request 38), AX button visual-click.
 - **Mac v5**: the style word (INDIAN RAGA / MANTRA VOICE) is an AX button style-toggle; styleLock saved in UserDefaults.
+- **Mac v6**: immersive view (Request 40): Immersive.swift-in-App: native full screen of the window, Root hides TopRow and controls, Esc monitor, cursor hides every 2 s; AX button immersive.

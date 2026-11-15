@@ -83,6 +83,27 @@ struct Flow: Layout {
     }
 }
 
+/// immersive view: the window goes native full screen on its own display, the picture alone; Esc brings it back
+final class Immersive: ObservableObject {
+    static let shared = Immersive()
+    @Published var on = false
+    private var hide: Timer?
+    private var esc: Any?
+    func changed(_ now: Bool) {
+        on = now
+        hide?.invalidate(); hide = nil
+        if let e = esc { NSEvent.removeMonitor(e); esc = nil }
+        if now {
+            hide = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in NSCursor.setHiddenUntilMouseMoves(true) }
+            esc = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+                if e.keyCode == 53 { App.shared.window?.toggleFullScreen(nil); return nil }
+                return e
+            }
+        } else { NSCursor.unhide() }
+    }
+    static func toggle() { App.shared.window?.toggleFullScreen(nil) }
+}
+
 struct Hairline: View { var body: some View { Rectangle().fill(Ink.line).frame(height: 1) } }
 
 func clock(_ s: Double) -> String { let t = max(0, Int(s)); return "\(t / 60):" + String(format: "%02d", t % 60) }
@@ -102,6 +123,9 @@ struct TopRow: View {
                 Text("v\(VERSION)").foregroundStyle(Ink.dim)
                 Text("TOP").foregroundStyle(onTop ? Ink.green : Ink.grey)
                     .word("Top", id: "top", value: onTop ? "on" : "off") { onTop.toggle(); TopRow.float(onTop) }
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Ink.grey)
+                    .frame(width: 22, height: 22)
+                    .word("Immersive view", id: "immersive") { Immersive.toggle() }
                 Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(Ink.grey)
                     .frame(width: 22, height: 22)
                     .word("Close window", id: "close") { App.shared.window?.performClose(nil) }
@@ -149,19 +173,26 @@ struct Root: View {
     @ObservedObject var player: Player
     @ObservedObject var lights: Lights
     @ObservedObject var viz: Viz
+    @ObservedObject var immersive = Immersive.shared
 
     var body: some View {
+        window
+    }
+
+    /// the picture alone; a click = the next visualization
+    var picture: some View {
+        VizView(viz: viz)
+            .overlay(Color.clear.contentShape(Rectangle()).onTapGesture { viz.next() }
+                .axButton("Next visualization", id: "visual-click") { viz.next() })
+    }
+
+    var window: some View {
         VStack(spacing: 0) {
-            TopRow()
-            Hairline()
-            VizView(viz: viz).frame(minHeight: 220)
-                // a click on the picture = the next visualization (same as VISUAL ›); a transparent layer, since the web view eats clicks
-                .overlay(Color.clear.contentShape(Rectangle()).onTapGesture { viz.next() }
-                    .axButton("Next visualization", id: "visual-click") { viz.next() })
-            Hairline()
-            controls.padding(.horizontal, 18).padding(.vertical, 12)
+            if !immersive.on { TopRow(); Hairline() }
+            picture.frame(minHeight: immersive.on ? 0 : 220)      // the same view in both states: the web view stays attached
+            if !immersive.on { Hairline(); controls.padding(.horizontal, 18).padding(.vertical, 12) }
         }
-        .background(Ink.ground)
+        .background(immersive.on ? Color.black : Ink.ground)
         .foregroundStyle(Ink.text)
         .ignoresSafeArea(.container, edges: .top)
     }
@@ -314,6 +345,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         w.title = APP_NAME
         w.titleVisibility = .hidden
         w.tabbingMode = .disallowed
+        w.collectionBehavior.insert(.fullScreenPrimary)
         w.titlebarAppearsTransparent = true
         w.isReleasedWhenClosed = false
         w.backgroundColor = NSColor(red: 0.043, green: 0.043, blue: 0.051, alpha: 1)
@@ -346,8 +378,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowDidBecomeKey(_ n: Notification) { enforceOneTitle() }
     func windowDidResignKey(_ n: Notification) { enforceOneTitle() }
     func windowDidResize(_ n: Notification) { enforceOneTitle() }
-    func windowDidEnterFullScreen(_ n: Notification) { enforceOneTitle() }
-    func windowDidExitFullScreen(_ n: Notification) { enforceOneTitle() }
+    func windowDidEnterFullScreen(_ n: Notification) { enforceOneTitle(); Immersive.shared.changed(true) }
+    func windowDidExitFullScreen(_ n: Notification) { enforceOneTitle(); Immersive.shared.changed(false) }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }   // ✕ closes the window, the sound goes on
     func applicationShouldHandleReopen(_ s: NSApplication, hasVisibleWindows: Bool) -> Bool {
