@@ -8,7 +8,7 @@ import Foundation
 
 final class Captions: ObservableObject {
     static let shared = Captions()
-    struct Line: Decodable { let t: Double; let e: Double; let text: String }
+    struct Line: Decodable { let t: Double; let e: Double; let text: String; let key: String? }
     private struct File: Decodable { let lines: [Line] }
 
     @Published var textOn: Bool = UserDefaults.standard.object(forKey: "textOn") as? Bool ?? true
@@ -32,7 +32,7 @@ final class Captions: ObservableObject {
         let ms = Int((preUntil?.timeIntervalSince1970 ?? 0) * 1000)
         viz?.run("TextFX.preshow(\(preOn), \(ms))")
     }
-    func show(_ text: String) { viz?.run("TextFX.show(\(q(text)))") }
+    func show(_ text: String, kind: String = "api") { viz?.run("TextFX.show(\(q(text)), \(q(kind)))") }
 
     func setText(_ on: Bool) { textOn = on; UserDefaults.standard.set(on, forKey: "textOn"); apply() }
     func setPre(_ on: Bool, until: Date? = nil) {
@@ -50,7 +50,8 @@ final class Captions: ObservableObject {
 
     /// a track begins (or is entered at `from`): its title melts in, and its spoken lines are loaded
     func trackStarted(_ t: Track, from: Double) {
-        show("DJ Mantra — " + t.title)
+        // one short block: the element and the style on two lines (at most five words)
+        show(t.style.isEmpty ? t.element : t.element + "\n" + t.style, kind: "title")
         shown = -1
         lines = []
         if let dir = Bundle.main.resourceURL?.appendingPathComponent("web/lines"),
@@ -64,7 +65,7 @@ final class Captions: ObservableObject {
     func tick(pos: Double) {
         while shown + 1 < lines.count, lines[shown + 1].t <= pos {
             shown += 1
-            if pos < lines[shown].e + 1.5 { show(lines[shown].text) }
+            if pos < lines[shown].e + 1.5, let k = lines[shown].key { show(k, kind: "voice") }
         }
     }
 }

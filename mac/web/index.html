@@ -97,6 +97,7 @@ window.room = {
     fill(L, l); fill(R, r);
     for(let i=0;i<1024;i++) M[i] = (L[i] + R[i]) >> 1;
     if(auto && performance.now() - lastChange > 40000) load(ix + 1, 6);   // Auto, as on the phone: every 40 s, 6 s blend
+    if(window.TextFX) TextFX.frame();
     viz.render({audioLevels:{timeByteArray:M, timeByteArrayL:L, timeByteArrayR:R}});
     frames++;
     if(performance.now() - ndiPoll < 2000) grabNdi();

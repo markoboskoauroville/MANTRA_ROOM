@@ -15,8 +15,8 @@
 "use strict";
 window.TextFX = (function () {
   let viz = null, enabled = true, cards = (window.PRESHOW_CARDS && window.PRESHOW_CARDS.cards) || [];
-  const queue = []; let lastShown = 0, shownCount = 0, lastText = "";
-  let pre = { on: false, until: 0, marks: new Set(), next: 0, deck: [], timer: null, started: 0 };
+  let shownCount = 0, lastText = "";
+  let pre = { on: false, until: 0, marks: new Set(), nextP: 0, deck: [], timer: null };
 
   function attach(v) {
     viz = v;
@@ -60,59 +60,98 @@ window.TextFX = (function () {
     };
   }
 
-  function launch(text) {
-    if (!viz || !viz.launchSongTitleAnim) return;
-    viz.launchSongTitleAnim(text); lastShown = Date.now(); shownCount++; lastText = text;
-  }
-  // one text at a time: butterchurn's animation runs 1.7 s, the next one waits for it
-  function pump() {
-    if (!enabled || !queue.length) return;
-    if (Date.now() - lastShown < 1900) return;
-    launch(queue.shift());
-  }
-  setInterval(pump, 200);
+  // ---------------------------------------------------------------- one block at a time, slow
+  // Marko, 15.11.2026: "a slow fade-in with effect, then show what is the most important, then slowly fade out. Only one block
+  // of text, only 4 or 5 words ... It's too much text." So: ONE block on screen, at most 5 words; 3 s fade-in (butterchurn's own
+  // zoom/wobble settling), 7 s hold, then the text is burned once into the feedback frame and the preset melts it away; then
+  // visuals only: cards wait 90-120 s after a block, and never come within 60 s of a track title.
+  const FADE_IN = 3000, HOLD = 7000, CARD_GAP = [90000, 120000], TITLE_QUIET = 60000, VOICE_GAP = 10000;
+  let active = null, pending = null, lastEnd = 0, lastTitle = -1e9;
 
-  function show(text) {
-    text = String(text == null ? "" : text).trim();
+  function clip5(text) {             // at most 5 words (marks like "·" "—" are not words); line breaks stay
+    let n = 0, out = [];
+    String(text).split("\n").forEach(function (line) {
+      const keep = [];
+      line.split(/\s+/).forEach(function (w) { if (!w) return; if (/[\p{L}\p{N}]/u.test(w)) { if (n >= 5) return; n++; } keep.push(w); });
+      if (keep.length) out.push(keep.join(" "));
+    });
+    return out.join("\n");
+  }
+  function startBlock(text) {
+    const tt = viz && viz.renderer && viz.renderer.titleText;
+    if (!tt) return;
+    tt.generateTitleTexture(text);
+    active = { t0: performance.now(), text: text }; lastText = text; shownCount++;
+  }
+  function setProgress(r) {          // butterchurn's title progress: <1 is drawn over the picture, >=1 is burned into the feedback
+    const rr = viz.renderer;
+    rr.supertext = { startTime: rr.time - r, duration: 1 };
+  }
+  // called once per rendered frame, BEFORE render(): drives the slow fade-in and hold, then the burn (the melt)
+  function frame() {
+    if (!viz || !viz.renderer) return;
+    if (!enabled) { if (active) { active = null; viz.renderer.supertext = { startTime: -1 }; } return; }
+    const now = performance.now();
+    if (!active && pending && (pending.kind === "title" || now - lastEnd > 800)) { const p = pending; pending = null; startBlock(p.text); }
+    if (!active) return;
+    const e = now - active.t0;
+    if (e < FADE_IN) {
+      const x = e / FADE_IN, a = x * x * (3 - 2 * x);          // smooth 0 -> 1
+      setProgress(Math.min(0.9, Math.pow(a, 1 / 0.3) + 0.0001)); // butterchurn shows the text at progress^0.3
+    } else if (e < FADE_IN + HOLD) {
+      setProgress(0.9);
+    } else {
+      setProgress(1.05);                                        // past 1: burned into the feedback once, the preset melts it
+      active = null; lastEnd = now;
+    }
+  }
+
+  // kind: "title" (track), "voice" (a key phrase), "api" / "count" (asked for), "card"
+  function show(text, kind) {
+    text = clip5(String(text == null ? "" : text).trim());
     if (!text) return;
-    if (queue.length >= 4) queue.shift();       // never a long backlog: the newest words matter
-    queue.push(text); pump();
+    kind = kind || "api";
+    const now = performance.now();
+    if (kind === "voice") {                                     // only into a quiet moment
+      if (active || pending || now - lastEnd < VOICE_GAP) return;
+    }
+    if (kind === "title") lastTitle = now;
+    pending = { text: text, kind: kind };                       // one waiting block at most: the newest wins
   }
 
   // ---------------------------------------------------------------- PRE-SHOW
-  function minutesText(m) { return m === 1 ? "1 minute until the live stream" : m + " minutes until the live stream"; }
+  function minutesText(m) { return m === 1 ? "1 minute to live" : m + " minutes to live"; }
   function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-  function cardText(c) { return c.title + (c.sanskrit ? "   " + c.sanskrit : "") + "\n" + c.text; }
-  function scheduleCard() { pre.next = Date.now() + (45 + Math.random() * 45) * 1000; }
+  function nextGap() { return CARD_GAP[0] + Math.random() * (CARD_GAP[1] - CARD_GAP[0]); }
   function preTick() {
     if (!pre.on) return;
-    const now = Date.now(), left = Math.round((pre.until - now) / 1000);
+    const now = Date.now(), p = performance.now(), left = Math.round((pre.until - now) / 1000);
     if (pre.until) {
-      // the marks 20, 10, 5, 1 minutes; on start the one we are inside is said once
       [20, 10, 5, 1].forEach(function (m) {
-        if (left <= m * 60 && left > m * 60 - 20 && !pre.marks.has(m)) { pre.marks.add(m); show(minutesText(m)); }
+        if (left <= m * 60 && left > m * 60 - 20 && !pre.marks.has(m)) { pre.marks.add(m); show(minutesText(m), "count"); }
       });
-      if (!pre.marks.has("first")) { pre.marks.add("first"); if (left > 60) show(minutesText(Math.round(left / 60))); }
-      if (left <= 0 && !pre.marks.has(0)) { pre.marks.add(0); show("The live stream begins now"); }
+      if (!pre.marks.has("first")) { pre.marks.add("first"); if (left > 60) show(minutesText(Math.round(left / 60)), "count"); }
+      if (left <= 0 && !pre.marks.has(0)) { pre.marks.add(0); show("Live begins now", "count"); }
     }
-    if (now >= pre.next && cards.length && (left > 20 || !pre.until || left <= 0 || true)) {
-      if (!pre.deck.length) pre.deck = shuffle(cards.slice());       // no card repeats until all were shown
-      show(cardText(pre.deck.pop()));
-      scheduleCard();
+    if (!active && !pending && cards.length && p >= pre.nextP && p - lastTitle > TITLE_QUIET) {
+      if (!pre.deck.length) pre.deck = shuffle(cards.slice());   // no card repeats until all were shown
+      show(pre.deck.pop().text, "card");
     }
   }
   function preshow(on, until) {
     pre.on = !!on; pre.until = until || 0; pre.marks = new Set();
     if (pre.timer) { clearInterval(pre.timer); pre.timer = null; }
     if (pre.on) {
-      pre.deck = shuffle(cards.slice()); pre.next = Date.now() + 8000;
+      pre.deck = shuffle(cards.slice()); pre.nextP = performance.now() + 20000;
       pre.timer = setInterval(preTick, 1000); preTick();
     }
   }
+  // after a block ends the next card waits its gap
+  setInterval(function () { if (!active && lastEnd && pre.nextP < lastEnd + 1) pre.nextP = lastEnd + nextGap(); }, 500);
   return {
-    attach: attach, show: show, preshow: preshow,
-    enable: function (b) { enabled = !!b; if (!enabled) queue.length = 0; },
+    attach: attach, show: show, preshow: preshow, frame: frame,
+    enable: function (b) { enabled = !!b; if (!enabled) pending = null; },
     setCards: function (c) { cards = c || []; },
-    state: function () { return { enabled: enabled, preshow: pre.on, until: pre.until, queued: queue.length, shown: shownCount, last: lastText, cards: cards.length, attached: !!(viz && viz.renderer && viz.renderer.titleText), wrapped: !!(viz && viz.renderer && viz.renderer.titleText && viz.renderer.titleText.__wrapped), err: window.__err || "" }; },
+    state: function () { return { enabled: enabled, preshow: pre.on, until: pre.until, queued: pending ? 1 : 0, active: !!active, shown: shownCount, last: lastText, cards: cards.length, attached: !!(viz && viz.renderer && viz.renderer.titleText), wrapped: !!(viz && viz.renderer && viz.renderer.titleText && viz.renderer.titleText.__wrapped), err: window.__err || "" }; },
   };
 })();

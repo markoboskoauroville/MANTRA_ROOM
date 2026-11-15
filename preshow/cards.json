@@ -2,189 +2,159 @@
  "cards": [
   {
    "title": "Om",
-   "text": "The first sound: the whole of existence in a single syllable.",
-   "sanskrit": "",
+   "text": "The first sound",
    "source": "general"
   },
   {
-   "title": "A · U · M",
-   "text": "Om has three sounds: waking, dreaming, deep sleep. The silence after is the fourth.",
-   "sanskrit": "",
+   "title": "A U M",
+   "text": "Waking, dreaming, deep sleep",
    "source": "general"
   },
   {
    "title": "Mantra",
-   "text": "From man, mind, and tra, tool: a mantra is a tool of the mind.",
-   "sanskrit": "",
+   "text": "Mantra means mind tool",
    "source": "general"
   },
   {
    "title": "Kirtan",
-   "text": "Call and response: one voice calls a name of the divine, everyone answers.",
-   "sanskrit": "",
+   "text": "Call and response singing",
    "source": "general"
   },
   {
    "title": "Bhajan",
-   "text": "A devotional song, simple enough that everyone can join in.",
-   "sanskrit": "",
+   "text": "A song everyone can sing",
    "source": "general"
   },
   {
    "title": "Om Namah Shivaya",
-   "text": "I bow to the inner Self, the stillness that was always here.",
-   "sanskrit": "ॐ नमः शिवाय",
+   "text": "Om Namah Shivaya: I bow",
    "source": "general"
   },
   {
-   "title": "Lokah Samastah Sukhino Bhavantu",
-   "text": "May all beings everywhere be happy and free.",
-   "sanskrit": "लोकाः समस्ताः सुखिनो भवन्तु",
+   "title": "Lokah Samastah",
+   "text": "May all beings be happy",
    "source": "general"
   },
   {
    "title": "Om Mani Padme Hum",
-   "text": "The jewel in the lotus: compassion rising from the mud into the light.",
-   "sanskrit": "ॐ मणि पद्मे हूँ",
+   "text": "Compassion rising from the mud",
    "source": "general"
   },
   {
    "title": "Hare Krishna",
-   "text": "Hare calls the divine energy, Krishna the one who draws every heart.",
-   "sanskrit": "हरे कृष्ण",
+   "text": "Hare Krishna: the heart's calling",
    "source": "general"
   },
   {
-   "title": "Om Shanti Shanti Shanti",
-   "text": "Peace three times: in the body, in the mind, in the world around us.",
-   "sanskrit": "ॐ शान्तिः शान्तिः शान्तिः",
+   "title": "Om Shanti",
+   "text": "Peace in body, mind, world",
    "source": "general"
   },
   {
    "title": "Gayatri",
-   "text": "A morning prayer: may the light of the sun awaken our understanding.",
-   "sanskrit": "गायत्री मन्त्र",
+   "text": "Light awakening our understanding",
    "source": "general"
   },
   {
    "title": "Jai",
-   "text": "Victory! In kirtan it is a shout of joy: let the light win.",
-   "sanskrit": "जय",
+   "text": "Jai means victory, joy",
    "source": "general"
   },
   {
    "title": "Santoshi",
-   "text": "Santosha means contentment: being at peace with what is, right now.",
-   "sanskrit": "सन्तोष",
+   "text": "Santosha means contentment",
    "source": "band site"
   },
   {
    "title": "Japa mala",
-   "text": "A string of 108 beads: one mantra for each bead, round and round.",
-   "sanskrit": "",
+   "text": "One mantra per bead",
    "source": "general"
   },
   {
-   "title": "Why 108",
-   "text": "108 is sacred in many traditions, and it fits the beads of the mala.",
-   "sanskrit": "",
+   "title": "108",
+   "text": "108 beads, round and round",
    "source": "general"
   },
   {
    "title": "Sat Nam",
-   "text": "Truth is my name: a greeting to the truth in everyone.",
-   "sanskrit": "सत् नाम",
+   "text": "Truth is my name",
    "source": "general"
   },
   {
    "title": "Shruti",
-   "text": "Shruti means what is heard. The drone of a shruti box is the ground of the song.",
-   "sanskrit": "श्रुति",
+   "text": "Shruti means what is heard",
    "source": "general"
   },
   {
-   "title": "The harmonium",
-   "text": "A small reed organ that keeps the key while the voices travel.",
-   "sanskrit": "",
+   "title": "Harmonium",
+   "text": "The harmonium holds the key",
    "source": "general"
   },
   {
-   "title": "The mridangam",
-   "text": "A two-headed drum of South India: the heartbeat under the chant.",
-   "sanskrit": "मृदङ्ग",
+   "title": "Mridangam",
+   "text": "The heartbeat under the chant",
    "source": "general"
   },
   {
    "title": "Navaratri",
-   "text": "Nine nights of the Goddess, nine nights of singing and dancing in the autumn.",
-   "sanskrit": "नवरात्रि",
+   "text": "Nine nights of the Goddess",
    "source": "band site"
   },
   {
    "title": "Garba",
-   "text": "A circle dance of Navaratri, turning around a light.",
-   "sanskrit": "",
+   "text": "A circle dance of light",
    "source": "band site"
   },
   {
    "title": "Diwali",
-   "text": "The festival of lights: a small flame is stronger than a dark room.",
-   "sanskrit": "दीपावली",
+   "text": "A small flame beats darkness",
    "source": "band site"
   },
   {
    "title": "Santoshi Kirtan Band",
-   "text": "Seven of us from Zagreb: voices, guitars, djembe, mridangam, harmonium, bells.",
-   "sanskrit": "",
+   "text": "Seven voices from Zagreb",
    "source": "band site"
   },
   {
    "title": "Come and sing",
-   "text": "Kirtan night: Saturday 21 November 2026, 19:00, Czech National House, Zagreb.",
-   "sanskrit": "",
+   "text": "Kirtan, 21 November, Zagreb",
    "source": "band site"
   },
   {
    "title": "Entry free",
-   "text": "Entry is free, donations are welcome. Come, sit, sing along.",
-   "sanskrit": "",
+   "text": "Entry free, donations welcome",
    "source": "band site"
   },
   {
-   "title": "Earth · A",
-   "text": "The vowel A, low in the belly and the pelvis: the element of Earth.",
-   "sanskrit": "",
+   "title": "Earth",
+   "text": "A: the element Earth",
    "source": "mantra room"
   },
   {
-   "title": "Water · U",
-   "text": "The vowel U, in the lower belly: the element of Water, flowing.",
-   "sanskrit": "",
+   "title": "Water",
+   "text": "U: the element Water",
    "source": "mantra room"
   },
   {
-   "title": "Fire · I",
-   "text": "The vowel I, at the solar plexus: the element of Fire.",
-   "sanskrit": "",
+   "title": "Fire",
+   "text": "I: the element Fire",
    "source": "mantra room"
   },
   {
-   "title": "Air · O",
-   "text": "The vowel O, in the chest, at the heart: the element of Air.",
-   "sanskrit": "",
+   "title": "Air",
+   "text": "O: the element Air",
    "source": "mantra room"
   },
   {
-   "title": "Ether · A-U-I-O",
-   "text": "All the vowels together, in the throat: the element of Ether, space.",
-   "sanskrit": "",
+   "title": "Ether",
+   "text": "A-U-I-O: the element Ether",
    "source": "mantra room"
   },
   {
    "title": "Toning",
-   "text": "Toning is not singing: hold one vowel and let it vibrate in the body.",
-   "sanskrit": "",
+   "text": "Hold one vowel, feel it",
    "source": "mantra room"
   }
- ]
+ ],
+ "note": "text: at most 5 words, the only thing shown; title: for people reading this file"
 }
