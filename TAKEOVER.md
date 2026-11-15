@@ -313,3 +313,76 @@ clone of this public repo: audio, linux, preshow; nothing from the Mac). Units a
 - **Mac v17**: the NDI picture was BLACK in v12-v16 when --ndi came at launch (room.ndi(true) ran before the page existed; ndiOn stayed false, and the receiver tests only counted frames). Now room.jpeg() itself arms the grab. Lesson: a receiver test must check the picture content (mean per frame changes), not only the frame count.
 - **Mac v18**: one short block (max 5 words) at a time: 3 s fade-in, 7 s hold, melt; cards every 90-120 s (never within 60 s of a title); voice key phrases (lines/guide.mp3.json key); cards.json is 5 words or less.
 - **Mac v19**: text block 3 s in / 5 s hold / 3 s out with our own alpha (renderTitle patched through gl.uniform1f), faint burn at the end; window starts windowed (isRestorable false, NSQuitAlwaysKeepsWindows false).
+
+### Render-ahead buffer: a busy VM never starves the viewers (15.11.2026, `linux/mrbuffer.py`)
+
+Marko, 15.11.2026: "now we are generating images and so many things transcribing. So if that can be solved by buffering
+... Let's say 20 seconds of finished video and then streaming it ... We can be 20-30 seconds in delay, no problem."
+At 10:32 the VM's load was 14.8 and the real-time encoder fell to 0.93x: every second it fell short was a hole for viewers.
+
+- **Two processes instead of one real-time encoder.** `mrbuffer.py encode` runs the SAME encoder (it imports
+  meditation_room_linux.py and plugs in through four small hooks: `Encoder.out_args()`, `CLOCK`, `AHEAD`,
+  `getattr(enc, "lead", ...)`; the defaults keep the direct encoder exactly as it was), but ffmpeg writes finished 2 s
+  MPEG-TS segments (`-f segment`, GOP 2 s) into the RAM ring `/dev/shm/mrbuf/run-<ms>/` and the PCM feeder may run up to
+  30 s ahead of the playout. `mrbuffer.py publish` (unit `mrbuffer-publish`, Nice -5, CPUWeight 1000) waits until 20 s
+  are finished, then sends the segments at exact real time (Python paces 40 ms slices) through one `ffmpeg -c copy` to
+  the private relay path vmtest; `mrlinux go-live` copies vmtest to santoshi as before. Viewers are ~25 s behind.
+- **Timestamps** are rewritten by the publisher (PTS/DTS/PCR, `restamp()`), so the relay sees one continuous stream
+  across encoder restarts (`mrlinux poster on|off` restarts ffmpeg) and fillers: vmtest never drops, so the go-live
+  forward never restarts.
+- **Never a cut**: if the ring runs dry the publisher sends a filler = the last segment's picture with Opus silence (same
+  codecs, built by ffmpeg from the newest segment) and counts it (`fillers`, `filler_s`); below 5 s it logs
+  `WARNING buffer low`. It never stops while its unit runs.
+- **Clock and countdown** are drawn for the moment the frame PLAYS: drawtext `%{pts:localtime:<epoch>:%T}`, and
+  `now_playout()` = now + the current lead for the pre-show countdown. Text/poster changes show ~25 s later (accepted).
+- **Priorities**: the encoder's drop-in (`meditation-room-linux.service.d/mrbuffer.conf`) sets Nice 10, CPUWeight 400,
+  CPUQuota 190 %: it may wait (it has 20-30 s in hand), but is still weighted above an ordinary job (100). Across systemd
+  services only CPUWeight counts (cgroup v2); Nice matters only inside one unit.
+- **Commands**: `mrbuffer status` (mode, units, buffered_s, fillers, warnings, min_buffer_s), `mrbuffer on|off` (installs or
+  removes the drop-in and restarts the encoder; refused while mrlinux-live runs: `mrlinux pause-live`, `mrbuffer on`, wait
+  for `state: playing`, `mrlinux go-live ... --resume`). Installed by `bash linux/install-mrbuffer.sh` (does not switch it on).
+- **Limits**: the buffer rides out bursts, not a machine that is slower than real time for ever: at speed s it lasts about
+  buffer / (1 - s) seconds (30 s at 0.8x = 150 s). A long overload needs a lighter encode (preset ultrafast or 540p).
+- **Tests**: `linux/buftest-relay.yml` (private MediaMTX: SRT 127.0.0.1:8992, HLS 127.0.0.1:8988, path buftest) and
+  `linux/buftest-soak.sh [min] [hog_at] [hog_s]` (production unit properties as transient units mrbuftest-*, stress-ng as
+  an ordinary system job, records the relay's HLS on the VM itself and reports gaps, silences, fillers, encoder speed).
+
+### The changing visuals on the VM (15.11.2026, Requests 50-51): a MilkDrop clip library, a new look every 30 s, the desktop's text
+
+Marko: "It's stuck in one view ... It's not the same app." and "every thirty seconds show different visualization."
+The VM cannot draw MilkDrop live, so the presets are drawn OFFLINE into clips and the stream plays the clips.
+
+- **milkrender.py** (+ milkrender/page.html): one butterchurn preset (the desktop's engine and presets, the twelve calm ones
+  first, then the other 88) in headless Chrome, frame by frame: every frame advances exactly 1/25 s (`render({elapsedTime})`)
+  with the 1024 samples of a meditation track (guide or a raga, a random minute) at that moment, so a slow machine still makes
+  a smooth, sound-driven 25 fps clip. readPixels -> POST -> x264 (CRF 24, max 3 Mbit/s, 75 s, 1280x720, silent, ~28 MB).
+  `milkrender.py list|bench|render|night|status`. Library ~ubuntu/mrvisuals/clips (<slug>.mp4 + .json).
+- **Speed** (VM, 2 Ampere cores, no GPU; measured 15.11.2026 at 50 % of one core while a replay ran): 720p SwiftShader
+  1.66 fps, Mesa llvmpipe (ANGLE gl-egl) 1.94 fps; 960x540 llvmpipe 2.69; 640x360 SwiftShader 3.65, llvmpipe 3.91.
+  Mac M1 Pro: 112 fps (x264 is then the limit: a 75 s clip in 1-1.7 min). projectM was not measured: Ubuntu packages only
+  libprojectm 3.1 (no renderer program), building one on the VM breaks the GitHub-only build rule, and on the same CPU
+  (llvmpipe) it would meet the same wall.
+- **Night job**: `mrvisuals-night.timer` 01:00 Zagreb -> `mrvisuals-night.service` (Nice 19, CPUQuota 100 %, CPUWeight 1,
+  IO idle, --gl egl, ends 07:00, RuntimeMaxSec 6 h 30). Before and during every clip it checks meditation-room-linux,
+  mrlinux-live, mrbuffer-publish, cloud-mixer-show, a publisher on relay path santoshi and a live studio ladder; any of them
+  = stop for the night. Presets already in the library are skipped. `mrlinux render [status|now|log]`.
+- **mrvisuals.py**: the player, plugged into meditation_room_linux.py through the hook VIS (one more encoder input: raw
+  1280x720 yuv420p on pipe:N, written by a thread; the pipe paces it). Every MRV_SWITCH (30) s a different clip, a random
+  30 s stretch of it, 1 s cross-fade, no clip again until all have played. While there are fewer than MRV_MIN_MILK (24)
+  MilkDrop clips, five ffmpeg styles are mixed in (mandala gold = the old picture, mandala moon, rings of light, Mandelbrot
+  dive, aurora; `mrvisuals.py styles`). Switch: `mrlinux visuals library|mandala` (default library when >= 2 clips).
+- **Text** in library mode is drawn by mrvisuals into the frames, with the desktop's scheduler and look (textfx.js,
+  Captions.swift): one block, max 5 words, 3 s in (from a soft blur) / 5 s / 3 s out (blur + 18 px drift = the melt), bold
+  white with a dark rim, centred; the track title at every track start (element + style), the guide's key phrases
+  (mac/web/lines, sparse-checked out on the VM) into quiet moments, in the PRE-SHOW the countdown ("Concert live at HH:MM" /
+  "Concert in N minutes") alternating with a card 90-120 s apart, a card never within 60 s of a title.
+- **Poster** (Marko, 15.11.2026: "don't stop the sound. Overlay the image over the stream and sound is going on"): the music
+  never stops for the poster any more; in library mode it fades in and out (2 s) over the visuals, no text block starts under
+  it; in mandala mode it is the old cut-in overlay. MRL_POSTER_SILENCE=1 brings back the silence.
+- **Audio AAC** 160 kbit/s 48 kHz stereo (iPhone HLS; Marko approved 15.11.2026), also in mrbuffer's filler; MRL_ACODEC=opus
+  reverts. MediaMTX's WebRTC (WHEP) readers cannot take AAC (picture without sound); the site's player is HLS only since
+  15.11.2026, so no viewer is affected, only a WHEP monitor tab.
+- Seeded 15.11.2026: six calm presets rendered on the Mac (Mandala, Lotus, Stained glass, Angel flight, Castle in the air,
+  Spiral; 148 MB over the SIM, under Marko's 200 MB line), the rest by the night job.
+- Private test: `bash linux/vistest.sh [secs] [HH:MM]` (encoder from the checkout -> own MediaMTX path vistest, SRT :8993,
+  HLS :8989, API :9994; Nice 19, CPUWeight 20), records, report + a frame every 2 s in ~/mrvistest.

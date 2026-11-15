@@ -92,3 +92,19 @@
 - Even with CPU free, the stream had a 0.7-1 s hole about once a minute (seen identically in the Chrome tab and in an independent
   ffmpeg read of the public HLS, so it is in the stream, not the monitor). The feeder kept the encoder only 0.25 s ahead, so any
   encode stall > 0.4 s (the viewer's WebRTC jitter buffer) became a hole. `lead` is now 1.0 s (env MRL_LEAD), restart at 10:53.
+
+## 15.11.2026, the changing visuals (MilkDrop clips rendered offline)
+- A GPU-less VM cannot draw MilkDrop live, but it can draw it OFFLINE: butterchurn's `render({audioLevels, elapsedTime})`
+  takes the frame's time and sound from us, so 2 fps of drawing still makes a smooth 25 fps clip that moves with the music.
+- Read a WebGL frame with readPixels right after render() (same task), POST it as binary to a local Python server, pipe it
+  into x264: 3.7 MB a frame is no problem on localhost. Rows come bottom-up: vflip.
+- MilkDrop is high-entropy video: CRF 23 gave 62 MB for 75 s (6.6 Mbit/s). Cap it (maxrate 3 Mbit/s, ~28 MB): the stream
+  re-encodes at 2.5 Mbit/s anyway.
+- Mesa llvmpipe through Chrome's ANGLE (`--use-gl=angle --use-angle=gl-egl`, headless) works on the VM and is ~15 % faster than
+  SwiftShader; both are CPU, so neither changes the picture: offline it is.
+- A second video input for a running ffmpeg without files: os.pipe() + `pass_fds` + `-i pipe:N`; the pipe's back-pressure
+  keeps the frames in step with the audio by timestamps. F_SETPIPE_SZ (1031) to 1 MB gives a frame of slack.
+- Text in the frames (numpy on the Y plane + neutral chroma under the text) gives the desktop's look (bold, dark rim, wrapped,
+  fade + blur melt) that drawtext cannot, and costs only the text's rectangle.
+- A load-average gate for a night job measures the job itself (Chrome's threads): gate on the real streams instead.
+- AAC in the stream for iPhone HLS means no sound for MediaMTX WebRTC (WHEP) readers; fine since the site plays HLS only.

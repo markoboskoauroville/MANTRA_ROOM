@@ -12,8 +12,9 @@ Nice=19
 CPUQuota=100%
 CPUWeight=1
 IOSchedulingClass=idle
-ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/milkrender.py night --until 07:00
-# it checks before and during every clip (meditation-room-linux, mrlinux-live, cloud-mixer, studio-ladder, relay path santoshi,
-# load > 2.5) and stops for the night when a stream runs; a hard end in any case
+ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/milkrender.py night --until 07:00 --gl egl
+# --gl egl: Mesa llvmpipe through ANGLE, measured ~15 % faster than SwiftShader on this VM (15.11.2026)
+# it checks before and during every clip (meditation-room-linux, mrlinux-live, cloud-mixer, studio-ladder, relay path santoshi)
+# and stops for the night when a stream runs; a hard end in any case
 RuntimeMaxSec=6h30min
 TimeoutStopSec=20

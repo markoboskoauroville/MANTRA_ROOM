@@ -308,8 +308,9 @@ def bench(size="1280x720", frames=100, gl="swiftshader", send=1, key=None):
 
 # ------------------------------------------------------------------ the night job -----------------------------------------
 
-BUSY_UNITS = ["meditation-room-linux", "mrlinux-live", "cloud-mixer", "studio-ladder", "mrbuffer-publish",
-              "cloud-mixer-show"]
+# units that mean "a stream is being made" (the cloud-mixer daemon and studio-ladder idle all day: they count only when they
+# publish, which the santoshi path and the studio HLS folder below show)
+BUSY_UNITS = ["meditation-room-linux", "mrlinux-live", "mrbuffer-publish", "cloud-mixer-show"]
 
 
 def busy():
@@ -328,11 +329,13 @@ def busy():
             return "relay path santoshi has a publisher"
     except Exception:
         pass
-    try:   # anything else big running (another worker's render, a transcode)
-        if os.getloadavg()[0] > 2.5:
-            return f"load {os.getloadavg()[0]:.1f}"
+    try:   # the studio ladder is writing HLS (a master comes from the Mac)
+        hls = "/dev/shm/studio-hls"
+        if os.path.isdir(hls) and any(time.time() - os.path.getmtime(os.path.join(hls, f)) < 60 for f in os.listdir(hls)):
+            return "studio-ladder is publishing"
     except OSError:
         pass
+    # (no load-average test: the render's own Chrome threads raise it; Nice 19 + CPUWeight 1 already yield to any other job)
     return None
 
 
