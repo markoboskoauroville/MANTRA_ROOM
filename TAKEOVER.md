@@ -259,3 +259,8 @@ Marko: *"Convert it to Swift and then we have the same meditation app in my Mac 
   Pixel → camera on the keyboard), -5 dB gain.
 - **Mac v3 (15.11.2026)**: one title only (Request 36). enforceOneTitle() in App.swift on every window state; guard
   mac/check_one_title.sh first in .github/workflows/mac.yml; state shows title_hidden. Release mac-v3.
+- **Mac v4 (15.11.2026)**: several outputs at once (Request 37). Player has one Lane (engine + node) per ticked device, all
+  scheduled from the same file and started on one host time (0.2 s ahead); the picture/meter tap and the position sit on
+  the first lane; GAIN is global; saved in UserDefaults "outputs"; `--output` may repeat; door: `outputs` arg of play-loop,
+  action `outputs-on`, state `outputs_on`. UI: row OUTPUTS, each device an AX button "● name" (Flow layout wraps).
+  Sync is as good as the devices' own latency (a Bluetooth speaker will lag); real listening on several devices is Marko's.

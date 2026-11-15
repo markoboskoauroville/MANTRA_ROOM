@@ -123,70 +123,28 @@ enum Songs {
     }
 }
 
-final class Player: ObservableObject {
-    @Published var playing = false
-    @Published var index = 0
-    @Published var pos: Double = 0
-    @Published var dur: Double = 0
-    @Published var level: Float = 0               // the output's peak, 0...1, for the meter
-    @Published var peakDb: Double = -120          // the loudest sample of the last second, dBFS (after the gain)
-    @Published var output: OutDev? = nil
-    @Published var gainDb: Double = UserDefaults.standard.object(forKey: "gainDb") as? Double ?? 0
-    @Published var until: Date? = nil
-    @Published var note = ""
-    @Published var played = 0                     // tracks started since launch (evidence of the loop)
-
-    private let engine = AVAudioEngine()
-    private let node = AVAudioPlayerNode()
+/// One output device: its own engine and player node, fed the same file as every other lane. The AUHAL of the engine is
+/// pointed at the device; the Mac's default output is never touched.
+final class Lane {
+    let engine = AVAudioEngine()
+    let node = AVAudioPlayerNode()
+    let dev: OutDev
     private var format: AVAudioFormat? = nil
-    private var startAt: Double = 0               // the position in the file where the segment began
-    private var gen = 0
-    private var file: AVAudioFile? = nil
-    private let lock = NSLock()
-    private var ringL = [Float](repeating: 0, count: 1024), ringR = [Float](repeating: 0, count: 1024)
-    private var peakHold: Float = 0, peakAt = Date()
-    private var clock: Timer? = nil
-    var onStop: (() -> Void)? = nil
-
-    init() {
+    init(_ d: OutDev, gainDb: Double) {
+        dev = d
         engine.attach(node)
-        let name = UserDefaults.standard.string(forKey: "output") ?? ""
-        output = Devices.find(name) ?? Devices.defaultOutput()
-        if let o = output { apply(o) }
-        connect(AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!)
-        engine.mainMixerNode.outputVolume = Float(pow(10, gainDb / 20))
-        engine.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in self?.take(buf) }
-        NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-            self?.recover()
+        if let unit = engine.outputNode.audioUnit {
+            var id = d.id
+            AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &id,
+                                 UInt32(MemoryLayout<AudioDeviceID>.size))
         }
-        clock = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in self?.everyQuarter() }
-        RunLoop.main.add(clock!, forMode: .common)
-    }
-
-    // ---------------------------------------------------------------- the output device
-    private func apply(_ d: OutDev) {
-        guard let unit = engine.outputNode.audioUnit else { return }
-        var id = d.id
-        AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &id,
-                             UInt32(MemoryLayout<AudioDeviceID>.size))
-    }
-    /// plays into this device from now on (the Mac's default output is never changed)
-    func setOutput(_ d: OutDev) {
-        let was = playing, at = pos
-        if engine.isRunning { node.stop(); engine.stop() }
-        gen += 1
-        output = d
-        UserDefaults.standard.set(d.name, forKey: "output")
-        apply(d)
-        engine.connect(engine.mainMixerNode, to: engine.outputNode, format: nil)
-        if was { play(index, from: at) }
-    }
-    func setGain(_ db: Double) {
-        gainDb = max(-30, min(6, db))
-        UserDefaults.standard.set(gainDb, forKey: "gainDb")
         engine.mainMixerNode.outputVolume = Float(pow(10, gainDb / 20))
+        let f = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!
+        engine.connect(node, to: engine.mainMixerNode, format: f)
+        engine.connect(engine.mainMixerNode, to: engine.outputNode, format: nil)
+        format = f
     }
-    private func connect(_ f: AVAudioFormat) {
+    func connect(_ f: AVAudioFormat) {
         guard format == nil || format!.sampleRate != f.sampleRate || format!.channelCount != f.channelCount else { return }
         let running = engine.isRunning
         if running { engine.stop() }
@@ -194,13 +152,99 @@ final class Player: ObservableObject {
         format = f
         if running { try? engine.start() }
     }
+    func setGain(_ db: Double) { engine.mainMixerNode.outputVolume = Float(pow(10, db / 20)) }
+    func halt() { node.stop(); if engine.isRunning { engine.stop() } }
+}
+
+final class Player: ObservableObject {
+    @Published var playing = false
+    @Published var index = 0
+    @Published var pos: Double = 0
+    @Published var dur: Double = 0
+    @Published var level: Float = 0               // the output's peak, 0...1, for the meter
+    @Published var peakDb: Double = -120          // the loudest sample of the last second, dBFS (after the gain)
+    @Published var outputs: [OutDev] = []         // every device ticked: the sound plays on all of them together
+    @Published var gainDb: Double = UserDefaults.standard.object(forKey: "gainDb") as? Double ?? 0
+    @Published var until: Date? = nil
+    @Published var note = ""
+    @Published var played = 0                     // tracks started since launch (evidence of the loop)
+
+    /// the first ticked device (the one the picture and the position are read from)
+    var output: OutDev? { outputs.first }
+
+    private var lanes: [Lane] = []
+    private var observers: [NSObjectProtocol] = []
+    private var startAt: Double = 0               // the position in the file where the segment began
+    private var gen = 0
+    private let lock = NSLock()
+    private var ringL = [Float](repeating: 0, count: 1024), ringR = [Float](repeating: 0, count: 1024)
+    private var peakHold: Float = 0, peakAt = Date()
+    private var clock: Timer? = nil
+    var onStop: (() -> Void)? = nil
+
+    init() {
+        let d = UserDefaults.standard
+        var names = d.stringArray(forKey: "outputs") ?? []
+        if names.isEmpty, let one = d.string(forKey: "output") { names = [one] }
+        var devs: [OutDev] = []
+        for n in names { if let x = Devices.find(n), !devs.contains(x) { devs.append(x) } }
+        if devs.isEmpty, let def = Devices.defaultOutput() { devs = [def] }
+        build(devs)
+        clock = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in self?.everyQuarter() }
+        RunLoop.main.add(clock!, forMode: .common)
+    }
+
+    // ---------------------------------------------------------------- the output devices
+    /// one lane per device; the tap for the picture and the meter sits on the first lane
+    private func build(_ devs: [OutDev]) {
+        for o in observers { NotificationCenter.default.removeObserver(o) }
+        observers = []
+        if let old = lanes.first { old.engine.mainMixerNode.removeTap(onBus: 0) }
+        for l in lanes { l.halt() }
+        lanes = devs.map { Lane($0, gainDb: gainDb) }
+        outputs = devs
+        if let main = lanes.first {
+            main.engine.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in self?.take(buf) }
+        }
+        for l in lanes {
+            observers.append(NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: l.engine, queue: .main) { [weak self] _ in
+                self?.recover()
+            })
+        }
+    }
+    private func save() {
+        UserDefaults.standard.set(outputs.map(\.name), forKey: "outputs")
+    }
+    /// plays into exactly these devices from now on (the Mac's default output is never changed)
+    func setOutputs(_ ds: [OutDev]) {
+        var devs: [OutDev] = []
+        for d in ds where !devs.contains(d) { devs.append(d) }
+        if devs.isEmpty { note = "at least one output stays on"; return }
+        let was = playing, at = pos
+        gen += 1
+        build(devs)
+        save()
+        if was { play(index, from: at) }
+    }
+    /// one device only (as before)
+    func setOutput(_ d: OutDev) { setOutputs([d]) }
+    func isOn(_ d: OutDev) -> Bool { outputs.contains(d) }
+    func toggle(_ d: OutDev) {
+        if isOn(d) { setOutputs(outputs.filter { $0 != d }) } else { setOutputs(outputs + [d]) }
+    }
+    func setGain(_ db: Double) {
+        gainDb = max(-30, min(6, db))
+        UserDefaults.standard.set(gainDb, forKey: "gainDb")
+        for l in lanes { l.setGain(gainDb) }
+    }
     private func recover() {
-        // the device changed under the engine (a sample rate, BlackHole reset): back to the same device and place
+        // a device changed under an engine (a sample rate, BlackHole reset): the same devices and place again
         guard playing else { return }
         let at = pos
         note = "the output changed; continuing"
-        if let o = output.flatMap({ Devices.find($0.uid) ?? Devices.find($0.name) }) { apply(o) }
-        engine.connect(engine.mainMixerNode, to: engine.outputNode, format: nil)
+        let devs = outputs.map { o in Devices.find(o.uid) ?? Devices.find(o.name) ?? o }
+        gen += 1
+        build(devs)
         play(index, from: at)
     }
 
@@ -212,22 +256,43 @@ final class Player: ObservableObject {
         let t = TRACKS[n]
         guard let url = Songs.url(t) else { note = "\(t.file) is not on this Mac yet"; return }
         gen += 1; let g = gen
-        node.stop()
+        for l in lanes { l.node.stop() }
         do {
-            let f = try AVAudioFile(forReading: url)
-            connect(f.processingFormat)
-            let rate = f.processingFormat.sampleRate
-            let start = AVAudioFramePosition(max(0, min(from, Double(f.length) / rate - 0.5)) * rate)
-            let count = AVAudioFrameCount(max(1, f.length - start))
-            node.scheduleSegment(f, startingFrame: start, frameCount: count, at: nil,
-                                 completionCallbackType: .dataPlayedBack) { [weak self] _ in
-                DispatchQueue.main.async { guard let s = self, s.gen == g, s.playing else { return }; s.advance() }
+            var failed: [String] = []
+            var started: [Lane] = []
+            var dur = 0.0, start0 = 0.0
+            for (k, lane) in lanes.enumerated() {
+                do {
+                    let f = try AVAudioFile(forReading: url)       // each lane reads the file on its own
+                    lane.connect(f.processingFormat)
+                    let rate = f.processingFormat.sampleRate
+                    let start = AVAudioFramePosition(max(0, min(from, Double(f.length) / rate - 0.5)) * rate)
+                    let count = AVAudioFrameCount(max(1, f.length - start))
+                    if k == 0 {
+                        lane.node.scheduleSegment(f, startingFrame: start, frameCount: count, at: nil,
+                                                  completionCallbackType: .dataPlayedBack) { [weak self] _ in
+                            DispatchQueue.main.async { guard let s = self, s.gen == g, s.playing else { return }; s.advance() }
+                        }
+                        dur = Double(f.length) / rate; start0 = Double(start) / rate
+                    } else {
+                        lane.node.scheduleSegment(f, startingFrame: start, frameCount: count, at: nil, completionHandler: nil)
+                    }
+                    if !lane.engine.isRunning { try lane.engine.start() }
+                    started.append(lane)
+                } catch {
+                    if k == 0 { throw error }
+                    failed.append(lane.dev.name)
+                    NSLog("[Room] %@ cannot play: %@", lane.dev.name, error.localizedDescription)
+                }
             }
-            if !engine.isRunning { try engine.start() }
-            node.play()
-            file = f; index = n; startAt = Double(start) / rate; dur = Double(f.length) / rate; pos = startAt
-            playing = true; played += 1; note = ""
-            NSLog("[Room] play %d %@ from %.1f s", n, t.title, startAt)
+            if started.count == 1 { started[0].node.play() }
+            else {                                                  // all lanes begin on the same host time
+                let at = AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: 0.2))
+                for l in started { l.node.play(at: at) }
+            }
+            index = n; startAt = start0; self.dur = dur; pos = startAt
+            playing = true; played += 1; note = failed.isEmpty ? "" : "no sound on: " + failed.joined(separator: ", ")
+            NSLog("[Room] play %d %@ from %.1f s on %d outputs", n, t.title, startAt, started.count)
         } catch {
             note = "cannot play \(t.file): \(error.localizedDescription)"
             NSLog("[Room] %@", note)
@@ -237,8 +302,7 @@ final class Player: ObservableObject {
     func next() { play(index + 1) }
     func stop() {
         gen += 1
-        node.stop()
-        if engine.isRunning { engine.pause() }
+        for l in lanes { l.node.stop(); if l.engine.isRunning { l.engine.pause() } }
         playing = false; pos = 0; level = 0
         lock.lock(); for i in 0..<1024 { ringL[i] = 0; ringR[i] = 0 }; lock.unlock()
         onStop?()
@@ -248,7 +312,7 @@ final class Player: ObservableObject {
         play(index + 1)
     }
     private func everyQuarter() {
-        if playing, let t = node.lastRenderTime, let p = node.playerTime(forNodeTime: t), p.sampleRate > 0 {
+        if playing, let node = lanes.first?.node, let t = node.lastRenderTime, let p = node.playerTime(forNodeTime: t), p.sampleRate > 0 {
             pos = startAt + Double(p.sampleTime) / p.sampleRate
         }
         if let u = until, Date() >= u {

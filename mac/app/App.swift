@@ -59,6 +59,30 @@ extension View {
     }
 }
 
+/// words laid out in rows that wrap: nothing is cut at the minimum width
+struct Flow: Layout {
+    var spacing: CGFloat = 12
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let w = proposal.width ?? 800
+        var x: CGFloat = 0, y: CGFloat = 0, row: CGFloat = 0, maxW: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0 && x + s.width > w { y += row + 6; x = 0; row = 0 }
+            x += s.width + spacing; row = max(row, s.height); maxW = max(maxW, x - spacing)
+        }
+        return CGSize(width: min(w, maxW), height: y + row)
+    }
+    func placeSubviews(in b: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = b.minX, y = b.minY, row: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > b.minX && x + s.width > b.maxX { y += row + 6; x = b.minX; row = 0 }
+            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
+            x += s.width + spacing; row = max(row, s.height)
+        }
+    }
+}
+
 struct Hairline: View { var body: some View { Rectangle().fill(Ink.line).frame(height: 1) } }
 
 func clock(_ s: Double) -> String { let t = max(0, Int(s)); return "\(t / 60):" + String(format: "%02d", t % 60) }
@@ -157,17 +181,22 @@ struct Root: View {
             }
             Fill(value: player.dur > 0 ? player.pos / player.dur : 0)
 
-            HStack(alignment: .top, spacing: 24) {
-                Cell(label: "OUTPUT") {
-                    HStack(spacing: 8) {
-                        Menu(player.output?.name ?? "choose") {
-                            ForEach(Devices.outputs(), id: \.self) { d in Button(d.name) { player.setOutput(d) } }
-                        }
-                        .menuStyle(.borderlessButton).fixedSize()
-                        .accessibilityIdentifier("output")
-                        Fill(value: Double(player.level), color: Ink.green).frame(width: 90)
+            // OUTPUTS: every device is a word; tick as many as you like, the sound plays on all of them together
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text("OUTPUTS").font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(Ink.dim)
+                    Fill(value: Double(player.level), color: Ink.green).frame(width: 90)
+                }
+                Flow(spacing: 18) {
+                    ForEach(Devices.outputs(), id: \.self) { d in
+                        Text((player.isOn(d) ? "● " : "○ ") + d.name).font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundStyle(player.isOn(d) ? Ink.green : Ink.grey).fixedSize()
+                            .word(d.name, id: "output-" + d.uid, value: player.isOn(d) ? "on" : "off") { player.toggle(d) }
                     }
                 }
+            }
+
+            HStack(alignment: .top, spacing: 24) {
                 Cell(label: "GAIN") {
                     HStack(spacing: 6) {
                         Text("−").word("Gain down", id: "gain-down") { player.setGain(player.gainDb - 1) }
@@ -255,7 +284,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func arguments() {
         let a = CommandLine.arguments
         func val(_ k: String) -> String? { a.firstIndex(of: k).flatMap { $0 + 1 < a.count ? a[$0 + 1] : nil } }
-        if let o = val("--output"), let d = Devices.find(o) { player.setOutput(d) }
+        let outs = a.enumerated().filter { $0.element == "--output" && $0.offset + 1 < a.count }.compactMap { Devices.find(a[$0.offset + 1]) }
+        if !outs.isEmpty { player.setOutputs(outs) }      // --output may be given more than once
         if let g = val("--gain-db").flatMap(Double.init) { player.setGain(g) }
         if let u = val("--until") { player.until = untilDate(u) }
         if a.contains("--lights") { lights.set(true) }

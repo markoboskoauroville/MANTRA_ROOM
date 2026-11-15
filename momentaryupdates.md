@@ -179,3 +179,9 @@ Reading (master): the meditation visuals on the keys with the liveness counter (
 > again, the bug I saw before in the meditation room has two times. One is echoing at the top. Take a screenshot, and please don't repeat this bug in the future. Don't repeat this bug
 
 Reading (master): "two times" = two titles. The app's own bold "Meditation Room (Mantra)" is drawn over the system window title, whose faded copy peeks out behind it. One title only, on every state of the window, and a guard in the workflow so it cannot return.
+
+## Request 37 (15.11.2026): the sound through several outputs at once
+
+> please update the app also that it can output the sound through multiple outputs, not only through one
+
+Reading (master): OUTPUT becomes a set of ticked devices (one engine per device, same file, started on the same host time); GAIN stays global; the choice is saved; --output may be repeated. The Mac's default output is never changed. Shipped as Mac v4 (v3 was already building).

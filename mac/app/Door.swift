@@ -27,6 +27,7 @@ final class Door {
         ["name": "lights", "does": "keyboard lights on or off, and what they show", "args": ["on": "bool",
          "mode": "meditation (the visuals + the counter) | patterns (G815 Lights' ten shows) | both (the visuals, a 20 s pattern every 5 min; default)"]],
         ["name": "output", "does": "plays into this device from now on (the Mac's default output is not changed)", "args": ["name": "string"]],
+        ["name": "outputs-on", "does": "plays on all these devices together", "args": ["names": "[string]"]],
         ["name": "outputs", "does": "the devices that can play sound", "args": [:]],
         ["name": "gain", "does": "the output gain in dB (-30 ... +6)", "args": ["db": "number"]],
         ["name": "style", "does": "the visual style: next, prev or a number", "args": ["to": "next | prev | int"]],
@@ -97,7 +98,7 @@ final class Door {
         var s: [String: Any] = [
             "ok": true, "version": VERSION, "playing": p.playing, "track": p.index + 1, "tracks": TRACKS.count,
             "title": p.track.title, "pos": (p.pos * 10).rounded() / 10, "dur": (p.dur * 10).rounded() / 10,
-            "output": p.output?.name ?? "", "system_default_output": Devices.defaultOutput()?.name ?? "",
+            "output": p.output?.name ?? "", "outputs_on": p.outputs.map(\.name), "system_default_output": Devices.defaultOutput()?.name ?? "",
             "gain_db": p.gainDb, "peak_dbfs": (p.peakDb * 10).rounded() / 10, "played": p.played,
             "lights": ["on": l.on, "mode": l.mode, "pattern": l.pattern, "way": l.way, "frames": l.sent, "fps": (l.fps * 10).rounded() / 10, "error": l.error],
             "visual": ["style": viz?.styleName ?? "", "auto": viz?.auto ?? true, "fps": ((viz?.fps ?? 0) * 10).rounded() / 10],
@@ -118,7 +119,12 @@ final class Door {
         case "play-loop":
             if let o = a["output"] as? String {
                 guard let d = Devices.find(o) else { return ["ok": false, "error": "no output device named \(o)"] }
-                if p.output != d { p.setOutput(d) }
+                if p.outputs != [d] { p.setOutput(d) }
+            }
+            if let os = a["outputs"] as? [String] {
+                let ds = os.compactMap { Devices.find($0) }
+                guard !ds.isEmpty else { return ["ok": false, "error": "outputs: names of devices"] }
+                if p.outputs != ds { p.setOutputs(ds) }
             }
             if let g = a["gain_db"] as? Double { p.setGain(g) }
             if let u = a["until"] as? String {
@@ -142,6 +148,9 @@ final class Door {
         case "output":
             guard let o = a["name"] as? String, let d = Devices.find(o) else { return ["ok": false, "error": "name: one of the outputs"] }
             p.setOutput(d); return ["ok": true, "result": state()]
+        case "outputs-on":
+            guard let os = a["names"] as? [String] else { return ["ok": false, "error": "names: [device names]"] }
+            p.setOutputs(os.compactMap { Devices.find($0) }); return ["ok": true, "result": state()]
         case "outputs": return ["ok": true, "result": Devices.outputs().map(\.name)]
         case "gain":
             guard let g = a["db"] as? Double else { return ["ok": false, "error": "db is a number"] }
