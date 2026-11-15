@@ -9,8 +9,9 @@ Environment=TZ=Europe/Zagreb
 ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/meditation_room_linux.py run
 Restart=on-failure
 RestartSec=5
-Nice=5
-CPUQuota=120%
+Nice=-5
+CPUQuota=190%
+CPUWeight=1000
 # NOT enabled at boot, no timer: started by `mrlinux start` only (Marko, 15.11.2026)
 
 [Install]

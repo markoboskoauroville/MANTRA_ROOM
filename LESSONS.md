@@ -75,3 +75,17 @@
 - A private MediaMTX next to the public relay: switch `moq: false`, or it opens :8892/:8893 on every interface.
 - MediaMTX HLS answers the first request with 302 ?cookieCheck=1: `curl -L`.
 - NDI proof = content, not count: look at a received frame and check the mean changes frame to frame (the frame-count test passed on a black picture for five versions).
+
+## 15.11.2026, vmclaude session on the VM (audio drops, poster cycle)
+- The 2-core VM is the bottleneck: the 720p25 encoder needs ~1.1 cores. A visible Chrome playing the stream, other Chromes and
+  yt-dlp loops took the rest, so ffmpeg ran at 0.87x and viewers heard a 1-2 s hole every 5 s. `speed` in status.json is a
+  cumulative average: measure instantaneous speed from out_time over 30 s and the encoder's /proc/<pid>/stat CPU ticks.
+- Fix without a restart: `systemctl set-property --runtime user.slice CPUWeight=40` (Chrome/yt-dlp), encoder `renice -5`,
+  quota 190 % (the unit now says Nice=-5, CPUQuota=190 %, CPUWeight=1000). After that: 1.35x catch-up, then 1.0x+, no more holes.
+- A viewer tab in the background (another tab in front) costs far less CPU than a visible one; the audio keeps playing.
+- Never `kill -STOP $(pgrep -f chrome)`: the pattern also matches your own shell command line and freezes it.
+- WHEP viewers do NOT recover when the publisher path is paused/restarted for ~10-15 s (the page froze at 141 s until reload; the
+  player has no stalled-video watchdog). So: never restart the encoder or pause-live while people watch; the poster cycle itself is
+  a filter switch inside one ffmpeg and needs no restart. Site fix (not done here): in player.js reload whep() when video.currentTime stands still > 8 s.
+- Poster: `mrlinux poster on --every 120 --for 60` writes poster.json; the encoder reads it at start. A new encoder with the poster
+  on can be started by writing poster.json by hand + pause-live + restart + go-live --resume (no ffmpeg kill => no dead forward).
