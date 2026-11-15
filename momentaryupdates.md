@@ -263,3 +263,9 @@ Reading (master): one block at a time, at most 5 words, enforced in web/textfx.j
 > The tip for the meditation room text should be 5 seconds on the screen, not less than that, and coming in fading in 3 seconds and fading out 3 seconds.
 
 Reading (master): each block is 3 s fade-in, 5 s fully visible, 3 s controlled fade-out (the alpha is ours, butterchurn's draw is patched to take it), then one faint burn (alpha 0.10) so the preset still melts a last whisper. Also: the window never reopens in native full screen (isRestorable false); it starts as a window. Mac v19.
+
+## Request 45 (15.11.2026 ~10:20): watch the live pre-show from the VM and monitor the audio; poster every two minutes
+
+> Please also open in the same machine, virtual machine, the stream and looking in different tab and monitor the audio. If audio is dropping, fix the errors. Second thing, we need to now test poster. So every two minutes put the poster for one minute in the silence and then continue again.
+
+Reading (worker): a viewer on the VM (own Chrome, own PulseAudio sink) measures the page's sound for drops, logged with times; `mrlinux poster on|off` = every 2 min of music and visuals, the 21.11.2026 concert poster full frame for 1 min in silence (music fades 1 s out and in, the track pauses), then on again. The 11:58:30 hand-over stays.
