@@ -137,7 +137,8 @@ def graph(pc=None):
         out = out.replace("[bg][scope]blend=all_mode=screen:shortest=1,format=yuv420p,scale=1280:720:flags=bicubic,",
                           "[1:v]setpts=N/(25*TB),format=yuv420p,").replace(card("block.txt", f, 48, 0), "")
         g = f"[0:a]anull[aout];{out}"
-    if pc:   # the poster over everything (picture, clock, text) for `for` s of every cycle; one decoded frame, looped
+    if pc and not VIS[0]:   # the poster over everything for `for` s of every cycle; one decoded frame, looped (with the clip
+        # library the player fades it in and out over the visuals itself, mrvisuals.Visuals.poster)
         cyc = pc["every"] + pc["for"]
         g = g.replace("[vout]", "[vmain]") + (
             f";movie='{esc(pc['frame'])}',loop=loop=-1:size=1:start=0,setpts=N/25/TB,fps=25,format=yuv420p[pst];"
@@ -164,6 +165,7 @@ class Encoder:
                *self.out_args()]
         vis, fds = VIS[0], ()
         if vis:
+            vis.set_poster(self.pc)
             vin, fds = vis.input_args()
             i = cmd.index("-filter_complex")
             cmd[i:i] = vin
@@ -216,8 +218,10 @@ def poster_frame(src):
 
 
 def gain_at(st, pc):
-    """Music gain at stream time st: 1, a 1 s fade out before the poster, 0 during it, a 1 s fade in after."""
-    if not pc:
+    """Music gain at stream time st. Marko, 15.11.2026: "when you insert the image, the poster, don't stop the sound. Overlay
+    the image over the stream and sound is going on." So the music never stops for the poster any more (MRL_POSTER_SILENCE=1
+    brings back the old 1 s fade out, silence, 1 s fade in)."""
+    if not pc or os.environ.get("MRL_POSTER_SILENCE") != "1":
         return 1.0
     cyc = pc["every"] + pc["for"]
     ph = st % cyc

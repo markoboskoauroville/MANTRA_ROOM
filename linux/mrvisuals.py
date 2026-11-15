@@ -22,7 +22,7 @@ them, in step with the audio by timestamps. Cost: decoding one 720p clip (two du
 
   mrvisuals.py styles [--secs 75]      render the ffmpeg styles into the library (fast, minutes)
   mrvisuals.py status                  the library
-  mrvisuals.py preview <out.mp4> [--secs 120] [--preshow HH:MM]   the player + text alone into a file (a test, no stream)
+  mrvisuals.py preview <out.mp4> [--secs 120] [--preshow HH:MM] [--poster every,for,image]   the player + text alone into a file (a test, no stream)
 
 Library: $MRV_LIB (default ~ubuntu/mrvisuals/clips), shared with milkrender.py. Switch: ~/.cache/mrlinux/visuals
 ("library" or "mandala"; `mrlinux visuals library|mandala`), read when the encoder starts.
@@ -53,6 +53,7 @@ XF = int(float(os.environ.get("MRV_XFADE", "1.0")) * FPS)   # cross-fade frames
 # Marko, 15.11.2026: "Let it, just every, thirty seconds show different visualization." Each clip plays a random stretch of
 # SWITCH seconds (the whole clip if shorter), then the next one; 0 = whole clips.
 SWITCH = float(os.environ.get("MRV_SWITCH", "30"))
+POSTER_FADE = float(os.environ.get("MRV_POSTER_FADE", "2.0"))   # the poster fades in and out over the visuals
 FONTS = [os.environ.get("MRV_FONT", ""), "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
          "/Library/Fonts/Arial Bold.ttf"]
@@ -284,6 +285,7 @@ class Text:
         self.track = None              # (start t, lines, next index)
         self.next_card, self.slot, self.deck = None, 0, []
         self.shown = 0
+        self.blocked = False           # the poster is (or soon will be) on: blocks wait
         self.lock = threading.Lock()
         self.events = []
 
@@ -375,7 +377,7 @@ class Text:
             self.active, self.last_end = None, t
             if self.next_card is not None:
                 self.next_card = t + random.uniform(*CARD_GAP)
-        if not self.active and self.pending and (self.pending[1] == "title" or t - self.last_end > 0.8):
+        if not self.active and self.pending and not self.blocked and (self.pending[1] == "title" or t - self.last_end > 0.8):
             text, _ = self.pending
             self.pending = None
             self.active = Block(text, t)
@@ -407,6 +409,31 @@ class Visuals:
         self.thread, self.stop = None, threading.Event()
         self.now = ""
         self.stats = {"frames": 0, "clips": 0, "slow_frames": 0}
+        self.poster = None             # (every, for, yuv420p frame): faded in over the visuals, the music goes on
+
+    def set_poster(self, pc):
+        """pc = meditation_room_linux's poster config {every, for, frame (1280x720 jpg)} or None."""
+        self.poster = None
+        if not pc or not pc.get("frame"):
+            return
+        try:
+            raw = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", pc["frame"], "-vf",
+                                  f"scale={W}:{H},format=yuv420p", "-frames:v", "1", "-f", "rawvideo", "pipe:1"],
+                                 capture_output=True, check=True).stdout
+            if len(raw) == FRAME:
+                self.poster = (float(pc["every"]), float(pc["for"]), raw)
+                log(f"poster every {pc['every']} s for {pc['for']} s, faded in over the visuals, music on")
+        except Exception as e:
+            log(f"poster frame failed: {e}")
+
+    def poster_alpha(self, t):
+        if not self.poster:
+            return 0.0
+        every, dur, _ = self.poster
+        ph = t % (every + dur) - every
+        if ph < 0:
+            return 0.0
+        return smooth(min(ph / POSTER_FADE, (dur - ph) / POSTER_FADE, 1.0))
 
     def input_args(self):
         self.rfd, self.wfd = os.pipe()
@@ -462,8 +489,14 @@ class Visuals:
                     fb = nxt.read()
                     if fb is not None:
                         fr = blend(fr, fb, 1.0 - cur.left() / XF)
+                pa = self.poster_alpha(t)
+                self.text.blocked = pa > 0 or self.poster_alpha(t + BLOCK) > 0   # no block starts under the poster
                 self.text.tick(t)
                 fr = self.text.draw(fr, t)
+                if pa >= 0.999:
+                    fr = self.poster[2]
+                elif pa > 0.001:
+                    fr = blend(fr, self.poster[2], pa)
                 out.write(fr)
                 last = fr
                 n += 1
@@ -551,7 +584,7 @@ def render_styles(lib=LIB, secs=75, only=None):
         log(f"style {key}: {secs} s in {took:.0f} s, {meta['bytes'] / 1e6:.1f} MB")
 
 
-def preview(path, secs=120, preshow=None, lib=LIB):
+def preview(path, secs=120, preshow=None, lib=LIB, poster=None):
     """The player and the text alone (the tracks' titles every 40 s, one guide start) into a file: a look without a stream."""
     sys.path.insert(0, HERE)
     mrl = None
@@ -563,6 +596,9 @@ def preview(path, secs=120, preshow=None, lib=LIB):
     except Exception as e:
         log(f"no pre-show ({e})")
     v = Visuals(mrl, lib)
+    if poster:   # "every,for,image"
+        ev, fo, img = poster.split(",", 2)
+        v.set_poster({"every": float(ev), "for": float(fo), "frame": img})
     args, fds = v.input_args()
     enc = subprocess.Popen(["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y", *args, "-t", str(secs),
                             "-c:v", "libx264", "-preset", "veryfast", "-b:v", "2500k", "-pix_fmt", "yuv420p", path],
@@ -590,6 +626,7 @@ if __name__ == "__main__":
     ap.add_argument("--secs", type=float, default=75)
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--preshow")
+    ap.add_argument("--poster", help="every,for,image (preview only)")
     ap.add_argument("--lib", default=LIB)
     a = ap.parse_args()
     if a.cmd == "styles":
@@ -602,4 +639,4 @@ if __name__ == "__main__":
         for c in cl:
             print(f"  {c.get('kind'):8s} {c.get('name')!s:40.40s} {c.get('secs')} s")
     elif a.cmd == "preview":
-        preview(a.out or "/tmp/mrvisuals-preview.mp4", a.secs, a.preshow, a.lib)
+        preview(a.out or "/tmp/mrvisuals-preview.mp4", a.secs, a.preshow, a.lib, a.poster)
