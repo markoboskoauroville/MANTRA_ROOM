@@ -36,7 +36,6 @@ final class NDISender: ObservableObject {
     private var loaded = false
     private var sender: UnsafeMutableRawPointer?
     private let q = DispatchQueue(label: "ndi.send")
-    private var pixels = [UInt8]()
     private var gen = 0
     static let wantsOn = UserDefaults.standard.bool(forKey: "ndi")
 
@@ -72,9 +71,9 @@ final class NDISender: ObservableObject {
             sender = made; gen += 1; on = true; note = ""
             UserDefaults.standard.set(true, forKey: "ndi")
             NSLog("[Room] NDI source on: %@", NDISender.sourceName)
-            pump(gen)
+            startPicture()
         } else {
-            on = false; gen += 1
+            on = false; gen += 1; stopPicture()
             UserDefaults.standard.set(false, forKey: "ndi")
             let s = sender, d = fDestroy; sender = nil
             q.async { if let s = s { d?(s) } }
@@ -82,33 +81,69 @@ final class NDISender: ObservableObject {
         }
     }
 
-    // ---------------------------------------------------------------- the picture: a snapshot of the visual, 25 per second at most
-    private func pump(_ g: Int) {
-        guard on, g == gen, let web = viz?.web else { return }
-        let t0 = Date()
+    // ---------------------------------------------------------------- the picture
+    // Two parts (MANTRA_MANIFEST modules/ndi-best-practice.md): (1) snapshots of the visual are taken as fast as WebKit
+    // gives them (about 24 per second) into `latest`; (2) a steady 25 Hz timer sends `latest` again and again, so the
+    // declared 25/1 is true even when a snapshot is late. A watchdog starts the snapshot loop anew when a callback never returns.
+    private var latest = [UInt8](repeating: 0, count: 1280 * 4 * 720)   // black until the first snapshot (q only)
+    private var timer: DispatchSourceTimer?
+    private var watchdog: Timer?
+    private var lastSnap = Date()
+    private var pumpToken = 0
+
+    private func startPicture() {
+        q.async { self.latest = [UInt8](repeating: 0, count: 1280 * 4 * 720) }
+        let t = DispatchSource.makeTimerSource(queue: q)
+        t.schedule(deadline: .now(), repeating: .milliseconds(40), leeway: .milliseconds(2))
+        t.setEventHandler { [weak self] in self?.tick() }
+        t.resume(); timer = t
+        lastSnap = Date()
+        pumpToken += 1; pump(pumpToken)
+        watchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self = self, self.on, Date().timeIntervalSince(self.lastSnap) > 1.5 else { return }
+            NSLog("[Room] NDI snapshot loop stalled; restarting")
+            self.lastSnap = Date(); self.pumpToken += 1; self.pump(self.pumpToken)
+        }
+    }
+    private func stopPicture() {
+        timer?.cancel(); timer = nil
+        watchdog?.invalidate(); watchdog = nil
+        pumpToken += 1
+    }
+    /// every 40 ms on q: the newest picture goes out, BGRX (alpha is always 255, so no alpha channel is promised)
+    private func tick() {
+        guard on, let s = sender, let f = fVideo else { return }
+        let w = 1280, h = 720, stride = w * 4
+        latest.withUnsafeMutableBytes { raw in
+            var fr = NDIVideoFrame(xres: Int32(w), yres: Int32(h), FourCC: 0x5852_4742 /* BGRX */, frame_rate_N: 25, frame_rate_D: 1,
+                                   picture_aspect_ratio: Float(w) / Float(h), frame_format_type: 1,
+                                   timecode: Int64.max, p_data: raw.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                                   line_stride_in_bytes: Int32(stride), p_metadata: nil, timestamp: 0)
+            withUnsafePointer(to: &fr) { f(s, UnsafeRawPointer($0)) }
+        }
+    }
+    private func pump(_ token: Int) {
+        guard on, token == pumpToken, let web = viz?.web else { return }
         let cfg = WKSnapshotConfiguration()
         cfg.snapshotWidth = 1280
         web.takeSnapshot(with: cfg) { [weak self] img, _ in
-            guard let self = self, self.on, g == self.gen else { return }
-            if let img = img { self.send(img) }
-            let wait = max(0.001, 0.04 - Date().timeIntervalSince(t0))
-            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { self.pump(g) }
+            guard let self = self, self.on, token == self.pumpToken else { return }
+            self.lastSnap = Date()
+            if let img = img { self.store(img) }
+            DispatchQueue.main.async { self.pump(token) }
         }
     }
-    private func send(_ img: NSImage) {
+    /// fits the snapshot into 1280x720 (black bars when the window is not 16:9) and keeps it as the newest picture
+    private func store(_ img: NSImage) {
         var r = CGRect(origin: .zero, size: img.size)
-        guard let cg = img.cgImage(forProposedRect: &r, context: nil, hints: nil) else { return }
-        guard cg.width > 0, cg.height > 0 else { return }
-        let w = 1280, h = 720                         // always 1280x720: the picture fitted, black bars if the window is not 16:9
+        guard let cg = img.cgImage(forProposedRect: &r, context: nil, hints: nil), cg.width > 0, cg.height > 0 else { return }
+        let w = 1280, h = 720, stride = w * 4
         let k = min(Double(w) / Double(cg.width), Double(h) / Double(cg.height))
         let dw = Double(cg.width) * k, dh = Double(cg.height) * k
         let dest = CGRect(x: (Double(w) - dw) / 2, y: (Double(h) - dh) / 2, width: dw, height: dh)
-        let stride = w * 4
-        let bytes = Array(repeating: UInt8(0), count: stride * h)
-        let g = gen
         q.async { [weak self] in
-            guard let self = self, self.on, g == self.gen, let s = self.sender, let f = self.fVideo else { return }
-            var buf = bytes
+            guard let self = self, self.on else { return }
+            var buf = [UInt8](repeating: 0, count: stride * h)
             buf.withUnsafeMutableBytes { raw in
                 guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: stride,
                                           space: CGColorSpaceCreateDeviceRGB(),
@@ -117,12 +152,8 @@ final class NDISender: ObservableObject {
                 ctx.interpolationQuality = .medium
                 ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1)); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
                 ctx.draw(cg, in: dest)
-                var fr = NDIVideoFrame(xres: Int32(w), yres: Int32(h), FourCC: 0x4152_4742 /* BGRA */, frame_rate_N: 25, frame_rate_D: 1,
-                                       picture_aspect_ratio: Float(w) / Float(h), frame_format_type: 1,
-                                       timecode: Int64.max, p_data: raw.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                                       line_stride_in_bytes: Int32(stride), p_metadata: nil, timestamp: 0)
-                withUnsafePointer(to: &fr) { f(s, UnsafeRawPointer($0)) }
             }
+            self.latest = buf
         }
     }
 

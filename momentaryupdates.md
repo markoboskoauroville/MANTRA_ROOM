@@ -225,3 +225,7 @@ Reading (master): debugged with an own receiver (frames arrive: 1280x720 BGRA, 2
 > please make the Linux version of this meditation room and install it on a virtual machine as a test stream. This will be a test stream picture and audio, so I don't spend my SIM card. Everything can now be tested through the Linux machine streaming directly to the Video Ninja on my Santosh page, and writing over it. Everything that needs to be written will be done that way, so we are not spending our internet. We have a simple way to test things with this NDI app. Let's do that. Please go install this in the virtual machine and convert the code to something which Linux can run
 
 Reading (worker): `meditation-room-linux` in linux/, on chromium-vm: the meditation tracks + a visual, 1280x720 25p, published to the Santoshi live path as its own paired camera "VM Test"; `mrlinux start|stop|status|go-live|stop-live`, not at boot.
+
+## Request 44 (15.11.2026): NDI review fixes
+
+Coordinator, from MANTRA_MANIFEST modules/ndi-best-practice.md: send BGRX instead of BGRA (alpha is always 255; Sound Link skips non-UYVY, a BGRA frame was handed to receivers asking UYVY_BGRA), and pace video on a steady 25 Hz timer that resends the last frame, with a watchdog for a snapshot callback that never returns. Mac v11.
