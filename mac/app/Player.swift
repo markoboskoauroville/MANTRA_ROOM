@@ -301,6 +301,7 @@ final class Player: ObservableObject {
             index = n; startAt = start0; self.dur = dur; pos = startAt
             playing = true; played += 1; note = failed.isEmpty ? "" : "no sound on: " + failed.joined(separator: ", ")
             NSLog("[Room] play %d %@ from %.1f s on %d outputs", n, t.title, startAt, started.count)
+            Captions.shared.trackStarted(t, from: startAt)
         } catch {
             note = "cannot play \(t.file): \(error.localizedDescription)"
             NSLog("[Room] %@", note)
@@ -340,6 +341,7 @@ final class Player: ObservableObject {
     private func everyQuarter() {
         if playing, let node = lanes.first?.node, let t = node.lastRenderTime, let p = node.playerTime(forNodeTime: t), p.sampleRate > 0 {
             pos = startAt + Double(p.sampleTime) / p.sampleRate
+            Captions.shared.tick(pos: pos)
         }
         if let u = until, Date() >= u {
             NSLog("[Room] until %@ reached: stop", "\(u)")

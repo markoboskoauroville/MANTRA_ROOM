@@ -30,6 +30,8 @@ final class Door {
         ["name": "outputs-on", "does": "plays on all these devices together", "args": ["names": "[string]"]],
         ["name": "outputs", "does": "the devices that can play sound", "args": [:]],
         ["name": "ndi", "does": "the picture and the sound as the NDI source Meditation Room (Mantra) (full NDI, not HX)", "args": ["on": "bool"]],
+        ["name": "text", "does": "shows these words melting into the visual (MilkDrop title animation)", "args": ["text": "string"]],
+        ["name": "preshow", "does": "PRE-SHOW: countdown to the live stream and a teaching card every 45-90 s", "args": ["on": "bool", "until": "HH:MM (optional)"]],
         ["name": "gain", "does": "the output gain in dB (-30 ... +6)", "args": ["db": "number"]],
         ["name": "style", "does": "the visual style: next, prev or a number", "args": ["to": "next | prev | int"]],
         ["name": "status", "does": "what plays, where, the level, the lights", "args": [:]],
@@ -104,7 +106,7 @@ final class Door {
             "lights": ["on": l.on, "mode": l.mode, "pattern": l.pattern, "way": l.way, "frames": l.sent, "fps": (l.fps * 10).rounded() / 10, "error": l.error],
             "visual": ["style": viz?.styleName ?? "", "auto": viz?.auto ?? true, "fps": ((viz?.fps ?? 0) * 10).rounded() / 10],
             "note": p.note, "songs_missing": Songs.missing.map(\.file),
-            "ndi": NDISender.shared.on, "title_hidden": App.shared.window?.titleVisibility == .hidden,
+            "ndi": NDISender.shared.on, "text_on": Captions.shared.textOn, "preshow": Captions.shared.preOn, "preshow_until": Captions.shared.preUntil.map { Int($0.timeIntervalSince1970) } ?? 0, "title_hidden": App.shared.window?.titleVisibility == .hidden,
             "window": NSApp.windows.first(where: { $0.title == APP_NAME })?.windowNumber ?? 0,
         ]
         if let u = p.until {
@@ -155,6 +157,13 @@ final class Door {
         case "outputs": return ["ok": true, "result": Devices.outputs().map(\.name)]
         case "ndi":
             NDISender.shared.set(a["on"] as? Bool ?? true); return ["ok": true, "result": state()]
+        case "text":
+            guard let t = a["text"] as? String, !t.isEmpty else { return ["ok": false, "error": "text: the words to show (melting)"] }
+            Captions.shared.show(t); return ["ok": true]
+        case "preshow":
+            var until: Date? = nil
+            if let u = a["until"] as? String { until = untilDate(u) }
+            Captions.shared.setPre(a["on"] as? Bool ?? true, until: until); return ["ok": true, "result": state()]
         case "gain":
             guard let g = a["db"] as? Double else { return ["ok": false, "error": "db is a number"] }
             p.setGain(g); return ["ok": true, "result": state()]

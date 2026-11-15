@@ -176,6 +176,7 @@ struct Root: View {
     @ObservedObject var player: Player
     @ObservedObject var lights: Lights
     @ObservedObject var viz: Viz
+    @ObservedObject var captions = Captions.shared
     @ObservedObject var immersive = Immersive.shared
 
     var body: some View {
@@ -291,6 +292,24 @@ struct Root: View {
                     }
                 }
             }
+            Hairline()
+            Flow(spacing: 24) {
+                Cell(label: "TEXT") {
+                    Text(captions.textOn ? "ON" : "OFF").foregroundStyle(captions.textOn ? Ink.green : Ink.grey)
+                        .word("Melting text", id: "text", value: captions.textOn ? "on" : "off") { captions.setText(!captions.textOn) }
+                }
+                Cell(label: "PRE-SHOW") {
+                    Text(captions.preOn ? "ON" : "OFF").foregroundStyle(captions.preOn ? Ink.green : Ink.grey)
+                        .word("Pre-show", id: "preshow", value: captions.preOn ? "on" : "off") { captions.setPre(!captions.preOn) }
+                }
+                Cell(label: "LIVE STREAM STARTS") {
+                    HStack(spacing: 8) {
+                        Text("−5").foregroundStyle(Ink.grey).word("Five minutes earlier", id: "preshow-earlier") { captions.shift(minutes: -5) }
+                        Text(captions.preUntil.map { d in let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d) } ?? "—").fixedSize()
+                        Text("+5").foregroundStyle(Ink.grey).word("Five minutes later", id: "preshow-later") { captions.shift(minutes: 5) }
+                    }
+                }
+            }
             if !player.note.isEmpty {
                 Text(player.note).font(.system(size: 12)).foregroundStyle(Ink.amber)
             }
@@ -337,6 +356,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if a.contains("--lights") { lights.set(true) }
         if a.contains("--no-lights") { lights.set(false) }
         if let m = val("--lights-mode") { lights.setMode(m) }
+        if let u = val("--preshow-until"), let d = untilDate(u) { Captions.shared.setPre(true, until: d) }
+        if a.contains("--no-text") { Captions.shared.setText(false) }
         if a.contains("--ndi") || NDISender.wantsOn { NDISender.shared.set(true) }
         if a.contains("--play-loop") { player.play(val("--from").flatMap(Int.init).map { $0 - 1 } ?? 0) }
     }

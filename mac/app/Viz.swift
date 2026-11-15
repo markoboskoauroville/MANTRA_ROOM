@@ -47,6 +47,8 @@ final class Viz: NSObject, ObservableObject, WKNavigationDelegate {
         let saved = UserDefaults.standard.integer(forKey: "style")
         js("room.setAuto(\(auto)); room.style(\(saved), 0)") { [weak self] in self?.read($0) }
         ready = true
+        Captions.shared.viz = self
+        Captions.shared.apply()
         start()
     }
 
@@ -73,6 +75,7 @@ final class Viz: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
 
+    func run(_ code: String) { web.evaluateJavaScript(code, completionHandler: nil) }
     private func js(_ code: String, _ done: ((String) -> Void)? = nil) {
         web.evaluateJavaScript(code) { r, _ in if let s = r as? String { done?(s) } }
     }
