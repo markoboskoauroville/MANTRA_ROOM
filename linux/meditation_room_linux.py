@@ -48,6 +48,8 @@ CARD_ON = FADE_IN + HOLD + FADE_OUT
 # the noon replay owns the site (CLOUD MIXER show: mixer starts 11:57, live 12:00). From 15.11.2026 the pre-show may run
 # until 11:56 and then stops the site itself; MRL_NOON_FROM changes the start of the window.
 NOON = (dt.time(*map(int, os.environ.get("MRL_NOON_FROM", "11:56").split(":"))), dt.time(13, 50))
+HANDOVER = dt.time(11, 58, 30)   # latest end of a pre-show that hands the live site over to the noon replay (--until)
+NO_SITE_STOP = os.environ.get("MRL_NO_SITE_STOP") == "1"   # hand-over: the site stays live, the mixer's GO joins it
 
 ELEMENTS = [("earth", "Earth · A"), ("water", "Water · U"), ("fire", "Fire · I"), ("air", "Air · O"),
             ("ether", "Ether · A-U-I-O"), ("aum", "OM")]
@@ -330,11 +332,15 @@ def checks():
 
 
 def end_time(arg):
-    """'HH:MM' (Zagreb, today) or minutes -> a monotonic deadline; never more than 2 hours."""
+    """'HH:MM[:SS]' (Zagreb, today) or minutes -> a monotonic deadline; never more than 2 hours, never past HANDOVER
+    when the time falls in the noon window (the CLOUD MIXER show waits from 11:59:00 while path santoshi has a publisher)."""
     if ":" in str(arg):
-        h, m = map(int, str(arg).split(":"))
+        p = list(map(int, str(arg).split(":"))) + [0]
         now = dt.datetime.now(ZAGREB)
-        secs = (now.replace(hour=h, minute=m, second=0, microsecond=0) - now).total_seconds()
+        at = now.replace(hour=p[0], minute=p[1], second=p[2], microsecond=0)
+        if NOON[0] <= at.time() < NOON[1] and at.time() > HANDOVER:
+            at = at.replace(hour=HANDOVER.hour, minute=HANDOVER.minute, second=HANDOVER.second)
+        secs = (at - now).total_seconds()
     else:
         secs = float(arg) * 60
     return time.monotonic() + max(0.0, min(secs, 7200.0))
@@ -367,12 +373,14 @@ def live(arg):
             went = True
         end = end_time(arg)
         while not stop.is_set() and fwd.poll() is None and time.monotonic() < end:
-            if in_noon():
+            if in_noon() and ":" not in str(arg):
                 print(f"[mrlinux] {NOON[0]:%H:%M} reached (the noon replay takes over): stopping", flush=True)
                 break
             stop.wait(5)
     finally:
-        if went:
+        if went and NO_SITE_STOP:
+            print("[mrlinux] hand-over: path santoshi freed, the site stays LIVE for the next publisher (no site STOP)", flush=True)
+        elif went:
             try:
                 print("[mrlinux] site STOP: " + json.dumps(site("stop")), flush=True)
             except Exception as e:
@@ -386,7 +394,12 @@ def live(arg):
 
 
 def site_stop_if_ours():
-    """ExecStopPost safety net: STOP on the site only when the live is ours (camera 'VM Test')."""
+    """ExecStopPost safety net: STOP on the site only when the live is ours (camera 'VM Test'). In a hand-over
+    (--no-site-stop) the site is left live and the encoder and test relay are stopped too, to free the CPU for the mixer."""
+    if NO_SITE_STOP:
+        subprocess.run(["systemctl", "--no-block", "stop", "meditation-room-linux.service", "mrlinux-relay.service"])
+        print("[mrlinux] hand-over: no site STOP; encoder and test relay stopping", flush=True)
+        return
     try:
         d = site("status")
         if d.get("live") and d.get("name") == "VM Test":

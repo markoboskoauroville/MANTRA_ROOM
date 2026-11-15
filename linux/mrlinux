@@ -3,7 +3,8 @@
 #   mrlinux start [--preshow-until HH:MM]   private test relay + encoder (nothing public)
 #   mrlinux stop                            stops live (if any), encoder and test relay
 #   mrlinux status                          services, encoder numbers (speed ~1.0x), test relay path, site state
-#   mrlinux go-live [min | --until HH:MM]   (default 5 min, max 2 h, never past 11:56 before the noon replay) public relay path santoshi + site GO as camera "VM Test";
+#   mrlinux go-live [min | --until HH:MM[:SS] [--no-site-stop]]  (default 5 min, max 2 h; --until in the noon window ends
+#                                           11:58:30 at the latest; --no-site-stop = hand-over: site stays live, encoder exits) public relay path santoshi + site GO as camera "VM Test";
 #                                           refused 11:50-13:50 Zagreb, while the site is live, or while santoshi has a publisher
 #   mrlinux stop-live                       site STOP, public copy ends; the test stream keeps running
 #   mrlinux text "words" | text --clear     words over the picture (line breaks: \n)
@@ -25,15 +26,16 @@ case "${1:-status}" in
     sudo systemctl stop meditation-room-linux mrlinux-relay
     echo "stopped";;
   go-live)
+    nss=0; for x in "$@"; do [ "$x" = "--no-site-stop" ] && nss=1; done
     if [ "$2" = "--until" ]; then
-      m=$3; case "$m" in [0-2][0-9]:[0-5][0-9]) ;; *) echo "--until needs HH:MM (Zagreb time, max 2 h ahead)"; exit 2;; esac
+      m=$3; case "$m" in [0-2][0-9]:[0-5][0-9]|[0-2][0-9]:[0-5][0-9]:[0-5][0-9]) ;; *) echo "--until needs HH:MM or HH:MM:SS (Zagreb, max 2 h ahead)"; exit 2;; esac
     else
       m=${2:-5}; case "$m" in ''|*[!0-9]*) echo "minutes must be a whole number (or --until HH:MM)"; exit 2;; esac
       [ "$m" -gt 120 ] && m=120
     fi
     out=$(sudo python3 $LIB/meditation_room_linux.py checks)
     case "$out" in "free to go live") ;; *) echo "$out"; exit 3;; esac
-    echo "MRL_MINUTES=$m" | sudo tee /run/mrlinux-live.env >/dev/null
+    printf 'MRL_MINUTES=%s\nMRL_NO_SITE_STOP=%s\n' "$m" "$nss" | sudo tee /run/mrlinux-live.env >/dev/null
     sudo systemctl start mrlinux-live
     echo "going live, ends at $m (min or HH:MM; stops by itself at 11:56 at the latest) (stop: mrlinux stop-live); log: journalctl -u mrlinux-live -f";;
   stop-live)
