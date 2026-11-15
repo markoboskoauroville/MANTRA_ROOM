@@ -18,6 +18,9 @@ Marko, 15.11.2026: "make the Linux version of this meditation room and install i
 Files: ~/.cache/mrlinux/{status.json,text.txt,now.txt,block.txt,preshow}. Site token: /etc/meditation-room-linux/site-token
 (root 600, never printed). Relay key: /etc/santoshi-relay/key (root:ubuntu 640, never printed).
 """
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+import audioop  # noqa: E402 (Python 3.12: still there; the gain of the poster fades)
 import datetime as dt
 import json
 import os
@@ -69,7 +72,7 @@ def esc(p):
     return p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
-def graph():
+def graph(pc=None):
     t = lambda name: esc(f"{CACHE}/{name}")
     f = esc(FONT)
     ph = f"mod(t\\,{CARD_P})"
@@ -96,18 +99,24 @@ def graph():
            + card("block.txt", f, 48, 0) +
            f"drawtext=fontfile={f}:textfile='{t('text.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.72:fontsize=48:fontcolor=white:"
            "box=1:boxcolor=black@0.38:boxborderw=20:line_spacing=10[vout]")
-    return f"[0:a]asplit=2[aout][av];{scope};{bg};{out}"
+    g = f"[0:a]asplit=2[aout][av];{scope};{bg};{out}"
+    if pc:   # the poster over everything (picture, clock, text) for `for` s of every cycle; one decoded frame, looped
+        cyc = pc["every"] + pc["for"]
+        g = g.replace("[vout]", "[vmain]") + (
+            f";movie='{esc(pc['frame'])}',loop=loop=-1:size=1:start=0,setpts=N/25/TB,fps=25,format=yuv420p[pst];"
+            f"[vmain][pst]overlay=0:0:eof_action=pass:enable='gte(mod(t\\,{cyc})\\,{pc['every']})'[vout]")
+    return g
 
 
 class Encoder:
-    def __init__(self, url):
-        self.url, self.proc, self.status = url, None, {}
+    def __init__(self, url, pc=None):
+        self.url, self.proc, self.status, self.pc = url, None, {}, pc
         self.track = ""
 
     def start(self):
         cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "warning", "-progress", "pipe:1", "-stats_period", "2",
                "-f", "s16le", "-ar", str(SR), "-ac", str(CH), "-i", "pipe:0",
-               "-filter_complex", graph(), "-map", "[vout]", "-map", "[aout]",
+               "-filter_complex", graph(self.pc), "-map", "[vout]", "-map", "[aout]",
                "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-profile:v", "baseline", "-bf", "0",
                "-g", "50", "-keyint_min", "50", "-r", "25", "-b:v", "2500k", "-maxrate", "2500k", "-bufsize", "2500k",
                "-pix_fmt", "yuv420p", "-threads", "2",
@@ -131,6 +140,44 @@ class Encoder:
 
 def write_status(d):
     wfile(CACHE + "/status.json", json.dumps(d, indent=1))
+
+
+def poster_cfg():
+    """~/.cache/mrlinux/poster.json {on, every, for, src}: every `every` s of music and visuals, the poster full frame for
+    `for` s in silence (Marko, 15.11.2026: "every two minutes put the poster for one minute in the silence")."""
+    try:
+        c = json.load(open(CACHE + "/poster.json"))
+    except Exception:
+        return None
+    if not c.get("on"):
+        return None
+    c.setdefault("every", 120); c.setdefault("for", 60)
+    c.setdefault("src", "/srv/cloud-mixer/media/subic/poster-next-2026-11-21.jpg")
+    return c if os.path.exists(c["src"]) else None
+
+
+def poster_frame(src):
+    """The poster fitted into 1280x720 over a blurred, darkened copy of itself (made once)."""
+    out = CACHE + "/poster-720.jpg"
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", src, "-filter_complex",
+                    "[0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,gblur=sigma=30,eq=brightness=-0.25[b];"
+                    "[0]scale=-2:720[f];[b][f]overlay=(W-w)/2:0", "-frames:v", "1", "-q:v", "2", "-y", out], check=True)
+    return out
+
+
+def gain_at(st, pc):
+    """Music gain at stream time st: 1, a 1 s fade out before the poster, 0 during it, a 1 s fade in after."""
+    if not pc:
+        return 1.0
+    cyc = pc["every"] + pc["for"]
+    ph = st % cyc
+    if ph >= pc["every"]:
+        return 0.0
+    if ph >= pc["every"] - 1:
+        return pc["every"] - ph
+    if st >= cyc and ph < 1:
+        return ph
+    return 1.0
 
 
 STREAM_T = [0.0]   # seconds of sound sent to the current encoder = drawtext's t
@@ -231,7 +278,15 @@ def run():
     lead = 0.25                        # keep the encoder a quarter second ahead, never more
     i = 0
     while not stop.is_set():
-        enc = Encoder(LOCAL_SRT)
+        pc = poster_cfg()
+        if pc:
+            try:
+                pc["frame"] = poster_frame(pc["src"])
+            except Exception as e:
+                print(f"[mrlinux] poster frame failed: {e}", flush=True)
+                pc = None
+        print(f"[mrlinux] encoder start, poster {'every %ss for %ss' % (pc['every'], pc['for']) if pc else 'off'}", flush=True)
+        enc = Encoder(LOCAL_SRT, pc)
         enc.start()
         t0, sent = time.monotonic(), 0
         STREAM_T[0] = 0.0
@@ -248,9 +303,15 @@ def run():
                 dec = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-i", path, "-f", "s16le", "-ar", str(SR),
                                         "-ac", str(CH), "pipe:1"], stdout=subprocess.PIPE)
                 while not stop.is_set():
-                    buf = dec.stdout.read(chunk)
-                    if not buf:
-                        break
+                    g = gain_at(sent / (SR * CH * 2), pc)
+                    if g <= 0.0:
+                        buf = bytes(chunk)               # the poster minute: silence, the track waits where it was
+                    else:
+                        buf = dec.stdout.read(chunk)
+                        if not buf:
+                            break
+                        if g < 1.0:
+                            buf = audioop.mul(buf, 2, g)
                     ahead = (sent / (SR * CH * 2)) - (time.monotonic() - t0)
                     if ahead > lead:
                         time.sleep(ahead - lead)
@@ -272,7 +333,7 @@ def run():
             enc.proc.kill()
         if not stop.is_set():
             write_status({"state": "restarting", "updated": time.strftime("%Y-%m-%d %H:%M:%S")})
-            time.sleep(3)
+            time.sleep(1)
     write_status({"state": "stopped", "updated": time.strftime("%Y-%m-%d %H:%M:%S")})
 
 
@@ -307,13 +368,16 @@ def local_path():
     return json.load(urllib.request.urlopen("http://127.0.0.1:9996/v3/paths/get/vmtest", timeout=10))
 
 
+RESUME = os.environ.get("MRL_RESUME") == "1"   # the site is already live as OUR camera (VMTest): publish again
+
+
 def checks():
     """Every reason not to go live, as a list of sentences (empty = free)."""
     why = []
     if in_noon():
         why.append(f"it is between {NOON[0]:%H:%M} and {NOON[1]:%H:%M} Zagreb time (the noon replay owns the site)")
     try:
-        if site_public().get("live"):
+        if site_public().get("live") and not (RESUME and site("status").get("name") in ("VM Test", "VMTest")):
             why.append("the site is already live (another camera or the cloud mixer)")
     except Exception as e:
         why.append(f"cannot read the site's live state ({e})")
@@ -356,8 +420,9 @@ def live(arg):
         sys.exit(3)
     key = open(PUBLIC_KEY).read().strip()
     pub = (f"srt://127.0.0.1:8890?streamid=publish:santoshi:santoshi:{key}&pkt_size=1316&latency=400000&transtype=live")
-    fwd = subprocess.Popen(["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-i", LOCAL_READ, "-map", "0", "-c", "copy",
-                            "-f", "mpegts", pub])
+    forward = lambda: subprocess.Popen(["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-i", LOCAL_READ, "-map", "0",
+                                        "-c", "copy", "-f", "mpegts", pub])
+    fwd = forward()
     went = False
     try:
         for _ in range(60):                       # wait until the public path has our stream
@@ -372,11 +437,18 @@ def live(arg):
             print("[mrlinux] public path ready, site GO: " + json.dumps(site("go")), flush=True)
             went = True
         end = end_time(arg)
-        while not stop.is_set() and fwd.poll() is None and time.monotonic() < end:
+        restarts = 0
+        while went and not stop.is_set() and time.monotonic() < end:
             if in_noon() and ":" not in str(arg):
                 print(f"[mrlinux] {NOON[0]:%H:%M} reached (the noon replay takes over): stopping", flush=True)
                 break
-            stop.wait(5)
+            if fwd.poll() is not None:            # the encoder restarted (poster on/off) or a hiccup: forward again
+                restarts += 1
+                print(f"[mrlinux] forward ended (code {fwd.returncode}), again in 1 s (restart {restarts})", flush=True)
+                if restarts > 30 or stop.wait(1):
+                    break
+                fwd = forward()
+            stop.wait(1)
     finally:
         if went and NO_SITE_STOP:
             print("[mrlinux] hand-over: path santoshi freed, the site stays LIVE for the next publisher (no site STOP)", flush=True)
@@ -396,6 +468,9 @@ def live(arg):
 def site_stop_if_ours():
     """ExecStopPost safety net: STOP on the site only when the live is ours (camera 'VM Test'). In a hand-over
     (--no-site-stop) the site is left live and the encoder and test relay are stopped too, to free the CPU for the mixer."""
+    if NO_SITE_STOP and os.environ.get("MRL_KEEP_ENCODER") == "1":
+        print("[mrlinux] live stopped by hand: no site STOP, the encoder keeps running", flush=True)
+        return
     if NO_SITE_STOP:
         subprocess.run(["systemctl", "--no-block", "stop", "meditation-room-linux.service", "mrlinux-relay.service"])
         print("[mrlinux] hand-over: no site STOP; encoder and test relay stopping", flush=True)

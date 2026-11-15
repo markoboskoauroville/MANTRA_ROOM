@@ -1,6 +1,6 @@
 [Unit]
 Description=Meditation Room (Linux): GO LIVE on the Santoshi site as camera "VM Test" (copy vmtest -> relay path santoshi)
-Requires=meditation-room-linux.service
+Wants=meditation-room-linux.service
 After=meditation-room-linux.service
 
 [Service]
