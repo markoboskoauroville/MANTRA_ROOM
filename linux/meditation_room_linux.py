@@ -15,7 +15,7 @@ Marko, 15.11.2026: "make the Linux version of this meditation room and install i
          on every exit the site gets STOP first.
   status the numbers (speed, fps, bitrate, track) as JSON.
 
-Files: ~/.cache/mrlinux/{status.json,text.txt,now.txt,count.txt,card_t.txt,card_b.txt,preshow}. Site token: /etc/meditation-room-linux/site-token
+Files: ~/.cache/mrlinux/{status.json,text.txt,now.txt,block.txt,preshow}. Site token: /etc/meditation-room-linux/site-token
 (root 600, never printed). Relay key: /etc/santoshi-relay/key (root:ubuntu 640, never printed).
 """
 import datetime as dt
@@ -42,7 +42,9 @@ SITE = "https://santoshi-band.pages.dev/api/live"
 SITE_TOKEN = "/etc/meditation-room-linux/site-token"
 ZAGREB = ZoneInfo("Europe/Zagreb")
 CARDS = os.environ.get("MRL_CARDS", HOME + "/MANTRA_ROOM/preshow/cards.json")  # shared with the Mac app (v13+)
-CARD_P, CARD_ON = 60, 16   # a card every 60 s of stream time, visible 16 s
+# Marko 15.11.2026: ONE block at a time, max 5 words, fade in ~3 s, hold ~7 s, fade out ~4 s, then 90-120 s of visuals only
+CARD_P, FADE_IN, HOLD, FADE_OUT = 120, 3.0, 7.0, 4.0
+CARD_ON = FADE_IN + HOLD + FADE_OUT
 NOON = (dt.time(11, 50), dt.time(13, 50))   # the noon replay owns the site (CLOUD MIXER show)
 
 ELEMENTS = [("earth", "Earth · A"), ("water", "Water · U"), ("fire", "Fire · I"), ("air", "Air · O"),
@@ -67,12 +69,12 @@ def graph():
     t = lambda name: esc(f"{CACHE}/{name}")
     f = esc(FONT)
     ph = f"mod(t\\,{CARD_P})"
-    alpha = (f"if(lt({ph}\\,2.5)\\,{ph}/2.5\\,if(lt({ph}\\,{CARD_ON - 2.5})\\,1\\,"
-             f"if(lt({ph}\\,{CARD_ON})\\,({CARD_ON}-{ph})/2.5\\,0)))")
+    alpha = (f"if(lt({ph}\\,{FADE_IN})\\,{ph}/{FADE_IN}\\,if(lt({ph}\\,{FADE_IN + HOLD})\\,1\\,"
+             f"if(lt({ph}\\,{CARD_ON})\\,({CARD_ON}-{ph})/{FADE_OUT}\\,0)))")
 
     def card(name, font, size, dy):
         return (f"drawtext=fontfile={font}:textfile='{t(name)}':reload=25:text_align=C:x=(w-tw)/2:"
-                f"y=h*0.36+{dy}-({ph}*1.2):fontsize={size}:line_spacing=10:fontcolor=white:box=1:boxcolor=black@0.38:"
+                f"y=h*0.42+{dy}-({ph}*0.8):fontsize={size}:line_spacing=10:fontcolor=white:box=1:boxcolor=black@0.38:"
                 f"boxborderw=14:alpha='{alpha}',")
     # the mandala: the stereo picture of the sound (lissajous), mirrored left-right and up-down, softened, warm gold
     scope = ("[av]aformat=channel_layouts=stereo,avectorscope=s=320x320:r=25:mode=lissajous:draw=line:scale=sqrt:zoom=0.9:"
@@ -85,12 +87,9 @@ def graph():
            f"drawtext=fontfile={f}:text='Meditation Room  -  VM test stream':x=40:y=34:fontsize=26:fontcolor=white@0.7,"
            f"drawtext=fontfile={f}:text='%{{localtime\\:%T}}':x=w-tw-40:y=34:fontsize=26:fontcolor=white@0.7,"
            f"drawtext=fontfile={f}:textfile='{t('now.txt')}':reload=25:x=40:y=h-60:fontsize=24:fontcolor=white@0.6,"
-           f"drawtext=fontfile={f}:textfile='{t('count.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.18:fontsize=44:fontcolor=white@0.9:"
-           "shadowcolor=black@0.6:shadowx=2:shadowy=2,"
-           # the teaching card, title + teaching (the Devanagari line is left out: Ubuntu's ffmpeg 6.1 drawtext does not shape
-           # Devanagari, conjuncts came out as boxes): fades in 2.5 s, stays, fades out 2.5 s, drifts up a little (a slow
-           # 'melt'), every CARD_P s of stream time
-           + card("card_t.txt", f, 46, 0) + card("card_b.txt", f, 34, 66) +
+           # the ONE text block (a countdown or a teaching card, max 5 words): fades in, holds, fades out, drifts up a little
+           # (a slow 'melt'), then visuals only until the next CARD_P cycle. No Devanagari: Ubuntu's ffmpeg cannot shape it.
+           + card("block.txt", f, 48, 0) +
            f"drawtext=fontfile={f}:textfile='{t('text.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.72:fontsize=48:fontcolor=white:"
            "box=1:boxcolor=black@0.38:boxborderw=20:line_spacing=10[vout]")
     return f"[0:a]asplit=2[aout][av];{scope};{bg};{out}"
@@ -130,31 +129,32 @@ def write_status(d):
     wfile(CACHE + "/status.json", json.dumps(d, indent=1))
 
 
-def preshow_loop(stop):
-    """--preshow-until HH:MM (Zagreb time) in ~/.cache/mrlinux/preshow: the countdown line over the picture."""
-    while not stop.is_set():
-        line = ""
-        try:
-            hhmm = open(CACHE + "/preshow").read().strip()
-        except OSError:
-            hhmm = ""
-        if hhmm:
-            try:
-                now = dt.datetime.now(ZAGREB)
-                h, m = map(int, hhmm.split(":"))
-                at = now.replace(hour=h, minute=m, second=0, microsecond=0)
-                left = (at - now).total_seconds()
-                if left > 90:
-                    line = f"{int((left + 59) // 60)} minutes until the live stream"
-                elif left > 0:
-                    line = "The live stream begins in a moment"
-            except Exception:
-                line = ""
-        wfile(CACHE + "/count.txt", line)
-        stop.wait(5)
-
-
 STREAM_T = [0.0]   # seconds of sound sent to the current encoder = drawtext's t
+
+
+def preshow_left():
+    """Seconds until the --preshow-until time (Zagreb), or None when the pre-show is off or over."""
+    try:
+        hhmm = open(CACHE + "/preshow").read().strip()
+        h, m = map(int, hhmm.split(":"))
+        now = dt.datetime.now(ZAGREB)
+        left = (now.replace(hour=h, minute=m, second=0, microsecond=0) - now).total_seconds()
+        return left if left > 0 else None
+    except Exception:
+        return None
+
+
+def countdown_line(left):
+    return f"Live stream in {int((left + 59) // 60)} minutes" if left > 90 else "Live stream begins soon"
+
+
+def five_words(c):
+    """A card's text when it has at most 5 words, else its title; never more than 5 words."""
+    for k in ("text", "title"):
+        w = str(c.get(k, "")).split()
+        if 0 < len(w) <= 5:
+            return " ".join(w)
+    return " ".join(str(c.get("title") or c.get("text") or "").split()[:5])
 
 
 def preshow_on():
@@ -175,8 +175,11 @@ def card_loop(stop):
         cycle, phase = int(st // CARD_P), st % CARD_P
         if CARD_ON + 4 < phase < CARD_P - 4 and cycle != last_cycle:
             last_cycle = cycle
-            line = ("", "")
-            if preshow_on():
+            line = ""
+            left = preshow_left()
+            if left is not None and cycle % 2 == 0:
+                line = countdown_line(left)          # even cycles: the countdown, odd cycles: a card
+            elif left is not None:
                 try:
                     cards = json.load(open(CARDS)).get("cards", [])
                 except Exception:
@@ -185,9 +188,8 @@ def card_loop(stop):
                     if not order:
                         order = random.sample(range(len(cards)), len(cards))
                     c = cards[order.pop() % len(cards)]
-                    line = (c.get("title", ""), wrap(c.get("text", ""), 52))
-            for n, v in zip(("card_t.txt", "card_b.txt"), line):
-                wfile(f"{CACHE}/{n}", v)
+                    line = five_words(c)
+            wfile(f"{CACHE}/block.txt", line)
         stop.wait(1)
 
 
@@ -198,15 +200,13 @@ def wrap(text, width):
 
 def run():
     os.makedirs(CACHE, exist_ok=True)
-    for n in ("card_t.txt", "card_b.txt"):
-        wfile(f"{CACHE}/{n}", "")
-    for n in ("text.txt", "now.txt", "count.txt"):
+    wfile(f"{CACHE}/block.txt", "")
+    for n in ("text.txt", "now.txt"):
         if not os.path.exists(f"{CACHE}/{n}"):
             wfile(f"{CACHE}/{n}", "")
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
-    threading.Thread(target=preshow_loop, args=(stop,), daemon=True).start()
     threading.Thread(target=card_loop, args=(stop,), daemon=True).start()
     chunk = SR * CH * 2 // 50          # 20 ms of PCM
     lead = 0.25                        # keep the encoder a quarter second ahead, never more

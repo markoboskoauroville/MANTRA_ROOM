@@ -7,7 +7,7 @@
 #                                           refused 11:50-13:50 Zagreb, while the site is live, or while santoshi has a publisher
 #   mrlinux stop-live                       site STOP, public copy ends; the test stream keeps running
 #   mrlinux text "words" | text --clear     words over the picture (line breaks: \n)
-#   mrlinux preshow HH:MM | preshow --off   countdown "N minutes until the live stream"
+#   mrlinux preshow HH:MM | preshow --off   countdown "Live stream in N minutes" and a card (one block, max 5 words, every 120 s)
 #   mrlinux checks                          would go-live be allowed now?
 set -e
 LIB=/usr/local/lib/meditation-room-linux
