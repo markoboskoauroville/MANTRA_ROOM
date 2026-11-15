@@ -167,3 +167,9 @@ Also 10.11.2026, through the master: Suno song number 6, "Classical Om" from Yog
 ## Request 34 (15.11.2026): the meditation app on the Mac in Swift, its visuals on the keyboard lights, a test stream until 12:00
 
 > Uh go and see my meditation app. Convert it to Swift and then we have the same meditation app in my Mac. And then, you can also while you're building it, also do it uh publish it as a Mac app, Meditation 1. And then, I can enable control of the keyboard with the visualization from the meditation app. So my lights are like a low resolution LED LCD display, displaying whatever the app is showing. ... And then you run this app in the mode of controlling the keyboard lights, and in my camera, I can hear the, I can see the lights of course, visualizations, of course. Also, you need to programmatically change the old tracks from the meditation app one after the other in the loop, and until 12:00, this will be a test stream.
+
+## Request 35 (15.11.2026): both, pattern and meditation
+
+> I'm saying both, pattern and meditation.
+
+Reading (master): the meditation visuals on the keys with the liveness counter (F1-F6 binary seconds, ESC green/red) in every frame, and one of G815 Lights' ten patterns for 20 s every 5 minutes; lights mode meditation | patterns | both, default both.

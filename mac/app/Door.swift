@@ -20,11 +20,12 @@ final class Door {
     static let actions: [[String: Any]] = [
         ["name": "play-loop", "does": "plays every track one after the other in a loop",
          "args": ["output": "device name or a word of it (optional)", "until": "HH:MM local time to stop (optional)",
-                  "lights": "bool: keyboard lights on/off (optional)", "gain_db": "output gain in dB (optional)",
+                  "lights": "bool: keyboard lights on/off (optional)", "lights_mode": "meditation | patterns | both (optional)", "gain_db": "output gain in dB (optional)",
                   "from": "track number 1..13 (optional)"]],
         ["name": "next", "does": "the next track", "args": [:]],
         ["name": "stop", "does": "stops the sound (and the until time)", "args": [:]],
-        ["name": "lights", "does": "keyboard lights on or off", "args": ["on": "bool"]],
+        ["name": "lights", "does": "keyboard lights on or off, and what they show", "args": ["on": "bool",
+         "mode": "meditation (the visuals + the counter) | patterns (G815 Lights' ten shows) | both (the visuals, a 20 s pattern every 5 min; default)"]],
         ["name": "output", "does": "plays into this device from now on (the Mac's default output is not changed)", "args": ["name": "string"]],
         ["name": "outputs", "does": "the devices that can play sound", "args": [:]],
         ["name": "gain", "does": "the output gain in dB (-30 ... +6)", "args": ["db": "number"]],
@@ -98,7 +99,7 @@ final class Door {
             "title": p.track.title, "pos": (p.pos * 10).rounded() / 10, "dur": (p.dur * 10).rounded() / 10,
             "output": p.output?.name ?? "", "system_default_output": Devices.defaultOutput()?.name ?? "",
             "gain_db": p.gainDb, "peak_dbfs": (p.peakDb * 10).rounded() / 10, "played": p.played,
-            "lights": ["on": l.on, "way": l.way, "frames": l.sent, "fps": (l.fps * 10).rounded() / 10, "error": l.error],
+            "lights": ["on": l.on, "mode": l.mode, "pattern": l.pattern, "way": l.way, "frames": l.sent, "fps": (l.fps * 10).rounded() / 10, "error": l.error],
             "visual": ["style": viz?.styleName ?? "", "auto": viz?.auto ?? true, "fps": ((viz?.fps ?? 0) * 10).rounded() / 10],
             "note": p.note, "songs_missing": Songs.missing.map(\.file),
             "window": NSApp.windows.first(where: { $0.title == APP_NAME })?.windowNumber ?? 0,
@@ -124,13 +125,19 @@ final class Door {
                 p.until = d
             }
             if let on = a["lights"] as? Bool { l.set(on) }
+            if let m = a["lights_mode"] as? String { l.setMode(m) }
             let from = (a["from"] as? Int).map { $0 - 1 }
             if !p.playing || from != nil { p.play(from ?? p.index) }
             return ["ok": true, "result": state()]
         case "next": p.next(); return ["ok": true, "result": state()]
         case "stop": p.until = nil; p.stop(); return ["ok": true, "result": state()]
         case "lights":
-            l.set((a["on"] as? Bool) ?? !l.on); return ["ok": true, "result": state()]
+            if let m = a["mode"] as? String {
+                guard ["meditation", "patterns", "both"].contains(m) else { return ["ok": false, "error": "mode: meditation | patterns | both"] }
+                l.setMode(m)
+            }
+            if let on = a["on"] as? Bool { l.set(on) } else if a["mode"] == nil { l.set(!l.on) }
+            return ["ok": true, "result": state()]
         case "output":
             guard let o = a["name"] as? String, let d = Devices.find(o) else { return ["ok": false, "error": "name: one of the outputs"] }
             p.setOutput(d); return ["ok": true, "result": state()]

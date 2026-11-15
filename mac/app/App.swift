@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 1
+let VERSION = 2
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {
@@ -193,8 +193,17 @@ struct Root: View {
                     Text(lights.on ? "ON" : "OFF").foregroundStyle(lights.on ? Ink.green : Ink.grey)
                         .word("Keyboard lights", id: "lights", value: lights.on ? "on" : "off") { lights.set(!lights.on) }
                 }
+                Cell(label: "SHOWS") {
+                    HStack(spacing: 4) {
+                        ForEach(["meditation", "patterns", "both"], id: \.self) { m in
+                            if m != "meditation" { Text("|").foregroundStyle(Ink.dim) }
+                            Text(m.uppercased()).foregroundStyle(lights.mode == m ? Ink.green : Ink.grey)
+                                .word("Lights show " + m, id: "lights-" + m, value: lights.mode == m ? "on" : "off") { lights.setMode(m) }
+                        }
+                    }
+                }
                 Cell(label: "G815") {
-                    Text(lights.on ? (lights.error.isEmpty ? "\(lights.way) · \(Int(lights.fps.rounded())) fps · \(lights.sent) frames" : lights.error) : "—")
+                    Text(lights.on ? (lights.error.isEmpty ? (lights.pattern.isEmpty ? "\(lights.way) · \(Int(lights.fps.rounded())) fps · \(lights.sent) frames" : "pattern \(lights.pattern)") : lights.error) : "—")
                         .foregroundStyle(lights.error.isEmpty ? Ink.text : Ink.amber).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
                 Cell(label: "VISUAL") {
@@ -251,6 +260,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let u = val("--until") { player.until = untilDate(u) }
         if a.contains("--lights") { lights.set(true) }
         if a.contains("--no-lights") { lights.set(false) }
+        if let m = val("--lights-mode") { lights.setMode(m) }
         if a.contains("--play-loop") { player.play(val("--from").flatMap(Int.init).map { $0 - 1 } ?? 0) }
     }
 
@@ -260,6 +270,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                          backing: .buffered, defer: false)
         w.title = APP_NAME
         w.titleVisibility = .hidden
+        w.tabbingMode = .disallowed
         w.titlebarAppearsTransparent = true
         w.isReleasedWhenClosed = false
         w.backgroundColor = NSColor(red: 0.043, green: 0.043, blue: 0.051, alpha: 1)
