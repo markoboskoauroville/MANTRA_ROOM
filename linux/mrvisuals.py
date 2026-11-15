@@ -49,7 +49,10 @@ AUDIO = os.environ.get("MRL_AUDIO", REPO + "/android/app/src/main/assets/web/aud
 MIN_MILK = int(os.environ.get("MRV_MIN_MILK", "24"))   # below this many MilkDrop clips the ffmpeg styles are mixed in
 W, H, FPS = 1280, 720, 25
 FRAME = W * H * 3 // 2
-XF = int(float(os.environ.get("MRV_XFADE", "1.5")) * FPS)   # cross-fade frames
+XF = int(float(os.environ.get("MRV_XFADE", "1.0")) * FPS)   # cross-fade frames
+# Marko, 15.11.2026: "Let it, just every, thirty seconds show different visualization." Each clip plays a random stretch of
+# SWITCH seconds (the whole clip if shorter), then the next one; 0 = whole clips.
+SWITCH = float(os.environ.get("MRV_SWITCH", "30"))
 FONTS = [os.environ.get("MRV_FONT", ""), "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
          "/Library/Fonts/Arial Bold.ttf"]
@@ -112,10 +115,19 @@ class Bag:
 
 
 class Decoder:
-    def __init__(self, clip):
+    def __init__(self, clip, switch=None):
         self.clip, self.pos = clip, 0
-        self.frames = int(clip.get("frames") or float(clip.get("secs", 60)) * FPS)
-        self.p = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-threads", "1", "-i", clip["path"], "-an",
+        total = int(clip.get("frames") or float(clip.get("secs", 60)) * FPS)
+        seg = int((SWITCH if switch is None else switch) * FPS)
+        start = 0
+        if 0 < seg < total - FPS:                      # a random stretch of the clip, so a long clip is several looks
+            start = random.randint(0, total - seg - 1)
+            self.frames = seg
+        else:
+            self.frames = total
+        self.start = start / FPS
+        self.p = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-threads", "1", "-ss", f"{self.start:.2f}",
+                                   "-i", clip["path"], "-an",
                                    "-vf", f"scale={W}:{H},fps={FPS},format=yuv420p", "-f", "rawvideo", "pipe:1"],
                                   stdout=subprocess.PIPE, bufsize=0)
 
@@ -442,9 +454,9 @@ class Visuals:
                         cur.close()
                     cur, nxt = (nxt, None) if nxt else (self._open(), None)
                     if cur:
-                        log(f"clip: {cur.clip.get('name')}")
+                        log(f"clip: {cur.clip.get('name')} from {cur.start:.0f} s")
                     fr = (cur.read() if cur else None) or last
-                if cur and nxt is None and cur.left() <= XF + 50:
+                if cur and nxt is None and cur.left() <= XF + 40:
                     nxt = self._open()                          # starts decoding 2 s before the cross-fade
                 if cur and nxt and cur.left() < XF:
                     fb = nxt.read()
