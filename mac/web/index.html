@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Meditation Room (Mantra)</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+canvas#milk{width:100%;height:100%;display:block}
+</style>
+</head>
+<body>
+<canvas id="milk"></canvas>
+<script src="vendor/butterchurn.min.js"></script>
+<script src="vendor/butterchurnPresets.min.js"></script>
+<script>
+// Meditation Room (Mantra) on the Mac: the MilkDrop engine of the Android app (butterchurn 2.6.7, the same twelve calm
+// presets first). The sound is native (AVAudioEngine in Swift); Swift calls room.tick() 60 times a second with the last
+// 1024 samples of each channel, so the picture follows exactly what goes to the output (BlackHole for the stream).
+// tick() renders one frame and, when asked, returns the frame shrunk to gw x gh as hex RGB for the keyboard lights.
+"use strict";
+const BC = window.butterchurn && (window.butterchurn.default || window.butterchurn);
+const BP = window.butterchurnPresets && (window.butterchurnPresets.default || window.butterchurnPresets);
+const ALL = BP ? BP.getPresets() : {};
+const CALM = [
+  ["Mandala","Phat+fiShbRaiN+Eo.S_Mandala_Chasers_remix"],
+  ["Lotus","Aderrasi - Songflower (Moss Posy)"],
+  ["Stained glass","Eo.S. + Zylot - skylight (Stained Glass Majesty mix)"],
+  ["Angel flight","martin - angel flight"],
+  ["Castle in the air","martin - castle in the air"],
+  ["Spiral","Flexi - infused with the spiral"],
+  ["Mother of pearl","cope + martin - mother-of-pearl"],
+  ["Star ornament","Zylot - Star Ornament"],
+  ["Nebula","TonyMilkdrop - Magellan's Nebula [Flexi - you enter first + multiverse]"],
+  ["Frosty caves","martin - frosty caves 2"],
+  ["Potion of spirits","Aderrasi - Potion of Spirits"],
+  ["Sunflower","suksma - Rovastar - Sunflower Passion (Enlightment Mix)_Phat_edit + flexi und martin shaders - circumflex in character classes in regular expression"],
+].filter(([,k])=>ALL[k]);
+const calmKeys = new Set(CALM.map(x=>x[1]));
+const STYLES = CALM.map(([n,k])=>({name:n,key:k}))
+  .concat(Object.keys(ALL).filter(k=>!calmKeys.has(k)).map(k=>({name:k,key:k})));
+
+const c = document.getElementById("milk");
+const actx = new (window.AudioContext||window.webkitAudioContext)();   // butterchurn needs one; nothing is played into it
+let viz = null, ix = 0, auto = true, lastChange = performance.now(), frames = 0;
+const L = new Uint8Array(1024).fill(128), R = new Uint8Array(1024).fill(128), M = new Uint8Array(1024).fill(128);
+const g1 = document.createElement("canvas"), g2 = document.createElement("canvas");
+const x1 = g1.getContext("2d", {willReadFrequently:true}), x2 = g2.getContext("2d", {willReadFrequently:true});
+
+function size(){
+  const w = Math.max(64, c.clientWidth), h = Math.max(64, c.clientHeight);
+  c.width = Math.round(w*0.8); c.height = Math.round(h*0.8);
+  if(viz) viz.setRendererSize(c.width, c.height);
+}
+function load(i, blend){
+  if(!STYLES.length || !viz) return;
+  ix = (i + STYLES.length) % STYLES.length;
+  viz.loadPreset(ALL[STYLES[ix].key], blend == null ? 3 : blend);
+  lastChange = performance.now();
+}
+function init(){
+  size();
+  if(BC){ viz = BC.createVisualizer(actx, c, {width:c.width, height:c.height, pixelRatio:1, textureRatio:1}); load(ix, 0); }
+}
+function fill(arr, b64){
+  if(!b64) return;
+  const s = atob(b64), n = Math.min(arr.length, s.length);
+  for(let i=0;i<n;i++) arr[i] = s.charCodeAt(i);
+}
+const HEX = []; for(let i=0;i<256;i++) HEX.push((i<16?"0":"")+i.toString(16));
+
+window.room = {
+  // l, r: base64 of 1024 unsigned bytes (128 = silence); gw, gh: the size of the frame wanted back, 0 = none
+  tick(l, r, gw, gh){
+    if(!viz) return "";
+    fill(L, l); fill(R, r);
+    for(let i=0;i<1024;i++) M[i] = (L[i] + R[i]) >> 1;
+    if(auto && performance.now() - lastChange > 40000) load(ix + 1, 6);   // Auto, as on the phone: every 40 s, 6 s blend
+    viz.render({audioLevels:{timeByteArray:M, timeByteArrayL:L, timeByteArrayR:R}});
+    frames++;
+    if(!gw || !gh) return "";
+    // two steps (4x, then the size asked) so the small picture is an average, not a few sampled pixels
+    if(g1.width !== gw*4 || g1.height !== gh*4){ g1.width = gw*4; g1.height = gh*4; }
+    if(g2.width !== gw || g2.height !== gh){ g2.width = gw; g2.height = gh; }
+    x1.imageSmoothingQuality = "high"; x2.imageSmoothingQuality = "high";
+    x1.drawImage(c, 0, 0, g1.width, g1.height);
+    x2.drawImage(g1, 0, 0, gw, gh);
+    const d = x2.getImageData(0, 0, gw, gh).data;
+    let out = "";
+    for(let i=0;i<d.length;i+=4) out += HEX[d[i]] + HEX[d[i+1]] + HEX[d[i+2]];
+    return out;
+  },
+  style(i, blend){ load(i, blend == null ? 2 : blend); return this.state(); },
+  next(){ load(ix + 1, 2); return this.state(); },
+  prev(){ load(ix - 1, 2); return this.state(); },
+  setAuto(on){ auto = !!on; lastChange = performance.now(); return this.state(); },
+  state(){ return JSON.stringify({ix, name: STYLES[ix] ? STYLES[ix].name : "", count: STYLES.length, calm: CALM.length,
+                                   auto, frames, ok: !!viz}); },
+  names(){ return JSON.stringify(STYLES.slice(0, CALM.length).map(s=>s.name)); }
+};
+window.addEventListener("resize", size);
+init();
+</script>
+</body>
+</html>

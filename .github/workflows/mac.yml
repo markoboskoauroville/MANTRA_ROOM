@@ -1,0 +1,35 @@
+# TEMPLATE mac-swift.yml from MANTRA_MANIFEST/workflows. The Mac app Meditation Room (Mantra), folder mac/.
+# This repository also holds the Android app, whose releases are vN and own releases/latest (the site's download button
+# and the phone app open it). So the Mac releases are tagged mac-vN and are NOT marked Latest; the Mac app's updater
+# looks for the newest mac-v tag (mac/app/Updater.swift). On the Mac: gh release download mac-vN, /Applications, sign
+# "Mantra Apps".
+name: Mac app
+on:
+  push:
+    branches: [main]
+    paths: ["mac/**", ".github/workflows/mac.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: mac-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  APP: "Meditation Room (Mantra)"
+  VERSION_FILE: mac/app/App.swift
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: SIGN=- NO_INSTALL=1 ./mac/build.sh
+      - name: Pack
+        run: cd mac/build && ditto -c -k --keepParent "$APP.app" app.zip
+      - name: Release (mac-vN)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(sed -n 's/^let VERSION = \([0-9]*\)/\1/p' "$VERSION_FILE")
+          if gh release view "mac-v$V" >/dev/null 2>&1; then gh release upload "mac-v$V" mac/build/app.zip --clobber
+          else gh release create "mac-v$V" mac/build/app.zip --target "$GITHUB_SHA" --latest=false --title "$APP v$V (Mac)" --notes "$(git log -1 --format=%s)"; fi
