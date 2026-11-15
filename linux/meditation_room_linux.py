@@ -72,6 +72,15 @@ def esc(p):
     return p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
+# Hooks for the render-ahead buffer (linux/mrbuffer.py); the defaults are the direct real-time encoder.
+CLOCK = "%{localtime\\:%T}"   # drawtext text of the clock; mrbuffer draws the time the frame PLAYS (pts + epoch)
+AHEAD = [0.0]                 # seconds between rendering and playout (the pre-show countdown is computed for the playout)
+
+
+def now_playout():
+    return dt.datetime.now(ZAGREB) + dt.timedelta(seconds=AHEAD[0])
+
+
 def graph(pc=None):
     t = lambda name: esc(f"{CACHE}/{name}")
     f = esc(FONT)
@@ -92,7 +101,7 @@ def graph(pc=None):
           "scale=640:360,format=gbrp[bg]")
     out = ("[bg][scope]blend=all_mode=screen:shortest=1,format=yuv420p,scale=1280:720:flags=bicubic,"
            f"drawtext=fontfile={f}:textfile='{t('title.txt')}':reload=25:x=40:y=34:fontsize=26:fontcolor=white@0.7,"
-           f"drawtext=fontfile={f}:text='%{{localtime\\:%T}}':x=w-tw-40:y=34:fontsize=26:fontcolor=white@0.7,"
+           f"drawtext=fontfile={f}:text='{CLOCK}':x=w-tw-40:y=34:fontsize=26:fontcolor=white@0.7,"
            f"drawtext=fontfile={f}:textfile='{t('now.txt')}':reload=25:x=40:y=h-60:fontsize=24:fontcolor=white@0.6,"
            # the ONE text block (a countdown or a teaching card, max 5 words): fades in, holds, fades out, drifts up a little
            # (a slow 'melt'), then visuals only until the next CARD_P cycle. No Devanagari: Ubuntu's ffmpeg cannot shape it.
@@ -121,9 +130,12 @@ class Encoder:
                "-g", "50", "-keyint_min", "50", "-r", "25", "-b:v", "2500k", "-maxrate", "2500k", "-bufsize", "2500k",
                "-pix_fmt", "yuv420p", "-threads", "2",
                "-c:a", "libopus", "-b:a", "128k", "-ar", str(SR), "-ac", "2",
-               "-f", "mpegts", "-mpegts_flags", "+resend_headers", self.url]
+               *self.out_args()]
         self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         threading.Thread(target=self._progress, daemon=True).start()
+
+    def out_args(self):
+        return ["-f", "mpegts", "-mpegts_flags", "+resend_headers", self.url]
 
     def _progress(self):
         cur = {}
@@ -188,7 +200,7 @@ def preshow_left():
     try:
         hhmm = open(CACHE + "/preshow").read().strip()
         h, m = map(int, hhmm.split(":"))
-        now = dt.datetime.now(ZAGREB)
+        now = now_playout()
         left = (now.replace(hour=h, minute=m, second=0, microsecond=0) - now).total_seconds()
         return left if left > 0 else None
     except Exception:
@@ -225,7 +237,7 @@ def preshow_on():
     try:
         hhmm = open(CACHE + "/preshow").read().strip()
         h, m = map(int, hhmm.split(":"))
-        now = dt.datetime.now(ZAGREB)
+        now = now_playout()
         return now < now.replace(hour=h, minute=m, second=0, microsecond=0)
     except Exception:
         return False
@@ -289,6 +301,7 @@ def run():
         enc = Encoder(LOCAL_SRT, pc)
         enc.start()
         t0, sent = time.monotonic(), 0
+        lead = getattr(enc, "lead", 0.25)   # mrbuffer: may run up to its buffer ahead of real time
         STREAM_T[0] = 0.0
         try:
             while not stop.is_set() and enc.proc.poll() is None:

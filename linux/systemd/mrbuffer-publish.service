@@ -1,0 +1,17 @@
+[Unit]
+Description=Meditation Room (Linux): render-ahead publisher (finished 2 s segments from /dev/shm/mrbuf -> private relay vmtest at real time)
+Requires=mrlinux-relay.service
+After=mrlinux-relay.service
+# stopped together with the encoder (mrlinux stop, the noon hand-over)
+PartOf=meditation-room-linux.service
+
+[Service]
+User=ubuntu
+Environment=TZ=Europe/Zagreb
+ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/mrbuffer.py publish
+Restart=always
+RestartSec=1
+# the publisher is tiny (Python pacing + ffmpeg -c copy) and must never wait for the CPU
+Nice=-5
+CPUWeight=1000
+# NOT enabled at boot: pulled in by the encoder's drop-in (mrbuffer on)

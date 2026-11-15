@@ -1,0 +1,35 @@
+#!/bin/bash
+# mrbuffer: the render-ahead buffer of the Meditation Room (Linux) stream (MANTRA_ROOM/linux/mrbuffer.py, 15.11.2026).
+#   mrbuffer status        publisher state: buffered seconds, fillers (= moments the ring ran dry), warnings, min buffer
+#   mrbuffer on [--force]  encoder renders ahead into /dev/shm/mrbuf, mrbuffer-publish sends at real time (+25 s delay)
+#   mrbuffer off [--force] back to the direct real-time encoder
+# on/off restart the encoder (vmtest is gone for ~25 s while the buffer fills): refused while mrlinux-live runs, unless --force.
+set -e
+D=/etc/systemd/system/meditation-room-linux.service.d
+LIB=/usr/local/lib/meditation-room-linux
+live_guard() {
+  if [ "$1" != "--force" ] && systemctl is-active -q mrlinux-live; then
+    echo "mrlinux-live is running (public): first 'mrlinux pause-live', then 'mrbuffer $CMD', then 'mrlinux go-live ... --resume' when status says playing"; exit 3
+  fi
+}
+CMD=${1:-status}
+case "$CMD" in
+  on)
+    live_guard "$2"
+    sudo install -d "$D"; sudo install -m 644 $LIB/meditation-room-linux.mrbuffer.conf "$D/mrbuffer.conf"
+    sudo systemctl daemon-reload
+    if systemctl is-active -q meditation-room-linux; then sudo systemctl restart meditation-room-linux; fi
+    sudo systemctl start mrbuffer-publish 2>/dev/null || true
+    echo "render-ahead ON: the publisher starts when 20 s are finished (about 25 s); mrbuffer status";;
+  off)
+    live_guard "$2"
+    sudo rm -f "$D/mrbuffer.conf"; sudo systemctl daemon-reload
+    sudo systemctl stop mrbuffer-publish 2>/dev/null || true
+    if systemctl is-active -q meditation-room-linux; then sudo systemctl restart meditation-room-linux; fi
+    echo "render-ahead OFF: direct real-time encoder";;
+  status)
+    printf 'mode: %s\n' "$([ -f $D/mrbuffer.conf ] && echo render-ahead || echo direct)"
+    for u in meditation-room-linux mrbuffer-publish; do printf '%-24s %s\n' "$u" "$(systemctl is-active $u)"; done
+    python3 $LIB/mrbuffer.py status;;
+  *) sed -n 2,7p "$0"; exit 2;;
+esac
