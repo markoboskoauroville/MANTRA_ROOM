@@ -98,8 +98,11 @@ final class NDISender: ObservableObject {
     private func send(_ img: NSImage) {
         var r = CGRect(origin: .zero, size: img.size)
         guard let cg = img.cgImage(forProposedRect: &r, context: nil, hints: nil) else { return }
-        let w = cg.width & ~1, h = cg.height & ~1
-        guard w > 0, h > 0 else { return }
+        guard cg.width > 0, cg.height > 0 else { return }
+        let w = 1280, h = 720                         // always 1280x720: the picture fitted, black bars if the window is not 16:9
+        let k = min(Double(w) / Double(cg.width), Double(h) / Double(cg.height))
+        let dw = Double(cg.width) * k, dh = Double(cg.height) * k
+        let dest = CGRect(x: (Double(w) - dw) / 2, y: (Double(h) - dh) / 2, width: dw, height: dh)
         let stride = w * 4
         let bytes = Array(repeating: UInt8(0), count: stride * h)
         let g = gen
@@ -111,7 +114,9 @@ final class NDISender: ObservableObject {
                                           space: CGColorSpaceCreateDeviceRGB(),
                                           bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
                 else { return }
-                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+                ctx.interpolationQuality = .medium
+                ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1)); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+                ctx.draw(cg, in: dest)
                 var fr = NDIVideoFrame(xres: Int32(w), yres: Int32(h), FourCC: 0x4152_4742 /* BGRA */, frame_rate_N: 25, frame_rate_D: 1,
                                        picture_aspect_ratio: Float(w) / Float(h), frame_format_type: 1,
                                        timecode: Int64.max, p_data: raw.baseAddress?.assumingMemoryBound(to: UInt8.self),
