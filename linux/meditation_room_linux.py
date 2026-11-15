@@ -15,7 +15,7 @@ Marko, 15.11.2026: "make the Linux version of this meditation room and install i
          on every exit the site gets STOP first.
   status the numbers (speed, fps, bitrate, track) as JSON.
 
-Files: ~/.cache/mrlinux/{status.json,text.txt,now.txt,count.txt,card_t/s/b.txt,preshow}. Site token: /etc/meditation-room-linux/site-token
+Files: ~/.cache/mrlinux/{status.json,text.txt,now.txt,count.txt,card_t.txt,card_b.txt,preshow}. Site token: /etc/meditation-room-linux/site-token
 (root 600, never printed). Relay key: /etc/santoshi-relay/key (root:ubuntu 640, never printed).
 """
 import datetime as dt
@@ -34,7 +34,6 @@ HOME = os.path.expanduser("~ubuntu")
 AUDIO = os.environ.get("MRL_AUDIO", HOME + "/MANTRA_ROOM/android/app/src/main/assets/web/audio")
 CACHE = HOME + "/.cache/mrlinux"
 FONT = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
-FONT_CARD = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"  # Latin + Devanagari (the cards carry Sanskrit)
 SR, CH = 48000, 2
 LOCAL_SRT = "srt://127.0.0.1:8991?streamid=publish:vmtest&pkt_size=1316&latency=400000&transtype=live"
 LOCAL_READ = "srt://127.0.0.1:8991?streamid=read:vmtest&latency=400000&transtype=live"
@@ -67,7 +66,6 @@ def esc(p):
 def graph():
     t = lambda name: esc(f"{CACHE}/{name}")
     f = esc(FONT)
-    fc = esc(FONT_CARD if os.path.exists(FONT_CARD) else FONT)
     ph = f"mod(t\\,{CARD_P})"
     alpha = (f"if(lt({ph}\\,2.5)\\,{ph}/2.5\\,if(lt({ph}\\,{CARD_ON - 2.5})\\,1\\,"
              f"if(lt({ph}\\,{CARD_ON})\\,({CARD_ON}-{ph})/2.5\\,0)))")
@@ -89,9 +87,10 @@ def graph():
            f"drawtext=fontfile={f}:textfile='{t('now.txt')}':reload=25:x=40:y=h-60:fontsize=24:fontcolor=white@0.6,"
            f"drawtext=fontfile={f}:textfile='{t('count.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.18:fontsize=44:fontcolor=white@0.9:"
            "shadowcolor=black@0.6:shadowx=2:shadowy=2,"
-           # the teaching card, three lines (title, Sanskrit in Devanagari with its own font, the teaching): fades in 2.5 s,
-           # stays, fades out 2.5 s, drifts up a little (a slow 'melt'), every CARD_P s of stream time
-           + card("card_t.txt", f, 46, 0) + card("card_s.txt", fc, 38, 64) + card("card_b.txt", f, 34, 120) +
+           # the teaching card, title + teaching (the Devanagari line is left out: Ubuntu's ffmpeg 6.1 drawtext does not shape
+           # Devanagari, conjuncts came out as boxes): fades in 2.5 s, stays, fades out 2.5 s, drifts up a little (a slow
+           # 'melt'), every CARD_P s of stream time
+           + card("card_t.txt", f, 46, 0) + card("card_b.txt", f, 34, 66) +
            f"drawtext=fontfile={f}:textfile='{t('text.txt')}':reload=25:text_align=C:x=(w-tw)/2:y=h*0.72:fontsize=48:fontcolor=white:"
            "box=1:boxcolor=black@0.38:boxborderw=20:line_spacing=10[vout]")
     return f"[0:a]asplit=2[aout][av];{scope};{bg};{out}"
@@ -176,7 +175,7 @@ def card_loop(stop):
         cycle, phase = int(st // CARD_P), st % CARD_P
         if CARD_ON + 4 < phase < CARD_P - 4 and cycle != last_cycle:
             last_cycle = cycle
-            line = ("", "", "")
+            line = ("", "")
             if preshow_on():
                 try:
                     cards = json.load(open(CARDS)).get("cards", [])
@@ -186,8 +185,8 @@ def card_loop(stop):
                     if not order:
                         order = random.sample(range(len(cards)), len(cards))
                     c = cards[order.pop() % len(cards)]
-                    line = (c.get("title", ""), c.get("sanskrit", ""), wrap(c.get("text", ""), 52))
-            for n, v in zip(("card_t.txt", "card_s.txt", "card_b.txt"), line or ("", "", "")):
+                    line = (c.get("title", ""), wrap(c.get("text", ""), 52))
+            for n, v in zip(("card_t.txt", "card_b.txt"), line):
                 wfile(f"{CACHE}/{n}", v)
         stop.wait(1)
 
@@ -199,7 +198,7 @@ def wrap(text, width):
 
 def run():
     os.makedirs(CACHE, exist_ok=True)
-    for n in ("card_t.txt", "card_s.txt", "card_b.txt"):
+    for n in ("card_t.txt", "card_b.txt"):
         wfile(f"{CACHE}/{n}", "")
     for n in ("text.txt", "now.txt", "count.txt"):
         if not os.path.exists(f"{CACHE}/{n}"):
