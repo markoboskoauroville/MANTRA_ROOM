@@ -312,3 +312,4 @@ clone of this public repo: audio, linux, preshow; nothing from the Mac). Units a
 - Commands: `mrlinux start|stop|status|go-live [min]|stop-live|text "..."|text --clear|preshow HH:MM|preshow --off|checks`.
 - **Mac v17**: the NDI picture was BLACK in v12-v16 when --ndi came at launch (room.ndi(true) ran before the page existed; ndiOn stayed false, and the receiver tests only counted frames). Now room.jpeg() itself arms the grab. Lesson: a receiver test must check the picture content (mean per frame changes), not only the frame count.
 - **Mac v18**: one short block (max 5 words) at a time: 3 s fade-in, 7 s hold, melt; cards every 90-120 s (never within 60 s of a title); voice key phrases (lines/guide.mp3.json key); cards.json is 5 words or less.
+- **Mac v19**: text block 3 s in / 5 s hold / 3 s out with our own alpha (renderTitle patched through gl.uniform1f), faint burn at the end; window starts windowed (isRestorable false, NSQuitAlwaysKeepsWindows false).

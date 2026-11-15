@@ -257,3 +257,9 @@ Reading (master): the second line stands. While MANTRA_VOICE says `on` + `phase:
 > Please fix the text appearing frequency in the meditation room. It's becoming too fast. It needs to have a slow fade-in with effect, and then show what is the most important, and then slowly fade out. Only one block of text, only 4 or 5 words, and that's all. Understand? It's too much text.
 
 Reading (master): one block at a time, at most 5 words, enforced in web/textfx.js (clip5) for everything (titles, voice, API, cards). Timeline: 3 s fade-in (butterchurn's zoom/wobble settling, driven per frame), 7 s hold, then burned once into the feedback so the preset melts it away; cards wait 90-120 s after a block and 60 s after a track title; voice shows one key phrase per spoken sentence, only into a quiet moment (10 s after the last block). preshow/cards.json rewritten to 5 words or less (single source for the Linux version); the guide's lines file carries a `key` phrase per sentence. Track title = element and style on two lines. Mac v18.
+
+## Request 49 (15.11.2026): every text block 5 seconds on screen, fade in 3 s, fade out 3 s
+
+> The tip for the meditation room text should be 5 seconds on the screen, not less than that, and coming in fading in 3 seconds and fading out 3 seconds.
+
+Reading (master): each block is 3 s fade-in, 5 s fully visible, 3 s controlled fade-out (the alpha is ours, butterchurn's draw is patched to take it), then one faint burn (alpha 0.10) so the preset still melts a last whisper. Also: the window never reopens in native full screen (isRestorable false); it starts as a window. Mac v19.

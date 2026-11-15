@@ -23,6 +23,14 @@ window.TextFX = (function () {
     const tt = v && v.renderer && v.renderer.titleText;
     if (!tt || tt.__wrapped) return;
     tt.__wrapped = true;
+    // butterchurn fades the text by progress^0.3 only; here the block's alpha is ours (a controlled fade in and out)
+    const origRender = tt.renderTitle;
+    tt.renderTitle = function (t, e, i) {
+      const gl = this.gl, u = gl.uniform1f, self = this;
+      if (self.__alpha == null) return origRender.call(this, t, e, i);
+      gl.uniform1f = function (loc, v) { return u.call(gl, loc, loc === self.textColorLoc ? self.__alpha : v); };
+      try { return origRender.call(this, t, e, i); } finally { gl.uniform1f = u; }
+    };
     // the same texture upload as butterchurn's, with wrapped, centred lines in a clean bold font
     tt.generateTitleTexture = function (text) {
       const ctx = this.context2D, W = this.texsizeX, H = this.texsizeY, gl = this.gl;
@@ -65,7 +73,7 @@ window.TextFX = (function () {
   // of text, only 4 or 5 words ... It's too much text." So: ONE block on screen, at most 5 words; 3 s fade-in (butterchurn's own
   // zoom/wobble settling), 7 s hold, then the text is burned once into the feedback frame and the preset melts it away; then
   // visuals only: cards wait 90-120 s after a block, and never come within 60 s of a track title.
-  const FADE_IN = 3000, HOLD = 7000, CARD_GAP = [90000, 120000], TITLE_QUIET = 60000, VOICE_GAP = 10000;
+  const FADE_IN = 3000, HOLD = 5000, FADE_OUT = 3000, CARD_GAP = [90000, 120000], TITLE_QUIET = 60000, VOICE_GAP = 10000;
   let active = null, pending = null, lastEnd = 0, lastTitle = -1e9;
 
   function clip5(text) {             // at most 5 words (marks like "·" "—" are not words); line breaks stay
@@ -94,15 +102,19 @@ window.TextFX = (function () {
     const now = performance.now();
     if (!active && pending && (pending.kind === "title" || now - lastEnd > 800)) { const p = pending; pending = null; startBlock(p.text); }
     if (!active) return;
-    const e = now - active.t0;
-    if (e < FADE_IN) {
-      const x = e / FADE_IN, a = x * x * (3 - 2 * x);          // smooth 0 -> 1
-      setProgress(Math.min(0.9, Math.pow(a, 1 / 0.3) + 0.0001)); // butterchurn shows the text at progress^0.3
-    } else if (e < FADE_IN + HOLD) {
-      setProgress(0.9);
+    const e = now - active.t0, tt = viz.renderer.titleText;
+    if (e < FADE_IN) {                                          // 3 s: fades in while butterchurn's zoom/wobble settles
+      const x = e / FADE_IN, a = x * x * (3 - 2 * x);
+      tt.__alpha = a; setProgress(Math.min(0.9, Math.pow(Math.max(a, 0.001), 1 / 0.3)));
+    } else if (e < FADE_IN + HOLD) {                            // 5 s: fully there
+      tt.__alpha = 1; setProgress(0.9);
+    } else if (e < FADE_IN + HOLD + FADE_OUT) {                 // 3 s: a controlled fade out, no preset involved
+      const x = (e - FADE_IN - HOLD) / FADE_OUT;
+      tt.__alpha = 1 - x * x * (3 - 2 * x); setProgress(0.9);
     } else {
-      setProgress(1.05);                                        // past 1: burned into the feedback once, the preset melts it
+      tt.__alpha = 0.10; setProgress(1.05);                     // one faint burn into the feedback: a last whisper that melts
       active = null; lastEnd = now;
+      setTimeout(function () { tt.__alpha = null; }, 120);
     }
   }
 

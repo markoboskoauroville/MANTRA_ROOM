@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 18
+let VERSION = 19
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {
@@ -332,6 +332,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var refresh: Timer?
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         NSApp.appearance = NSAppearance(named: .darkAqua)
         menu()
         viz.player = player; viz.lights = lights
@@ -376,6 +377,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         w.collectionBehavior.insert(.fullScreenPrimary)
         w.titlebarAppearsTransparent = true
         w.isReleasedWhenClosed = false
+        w.isRestorable = false                    // never reopen in native full screen (immersive); it starts as a window
         w.backgroundColor = NSColor(red: 0.043, green: 0.043, blue: 0.051, alpha: 1)
         w.contentMinSize = NSSize(width: 860, height: 520)
         w.contentView = NSHostingView(rootView: Root(player: player, lights: lights, viz: viz))
