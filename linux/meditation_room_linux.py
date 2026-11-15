@@ -45,7 +45,9 @@ CARDS = os.environ.get("MRL_CARDS", HOME + "/MANTRA_ROOM/preshow/cards.json")  #
 # Marko 15.11.2026: ONE block at a time, max 5 words, fade in 3 s, at least 5 s readable, fade out 3 s, then 90-120 s of visuals only
 CARD_P, FADE_IN, HOLD, FADE_OUT = 120, 3.0, 5.0, 3.0
 CARD_ON = FADE_IN + HOLD + FADE_OUT
-NOON = (dt.time(11, 50), dt.time(13, 50))   # the noon replay owns the site (CLOUD MIXER show)
+# the noon replay owns the site (CLOUD MIXER show: mixer starts 11:57, live 12:00). From 15.11.2026 the pre-show may run
+# until 11:56 and then stops the site itself; MRL_NOON_FROM changes the start of the window.
+NOON = (dt.time(*map(int, os.environ.get("MRL_NOON_FROM", "11:56").split(":"))), dt.time(13, 50))
 
 ELEMENTS = [("earth", "Earth · A"), ("water", "Water · U"), ("fire", "Fire · I"), ("air", "Air · O"),
             ("ether", "Ether · A-U-I-O"), ("aum", "OM")]
@@ -84,7 +86,7 @@ def graph():
     bg = ("gradients=s=160x90:r=25:c0=0x1a0b2e:c1=0x3d1a0a:c2=0x0a2a2a:c3=0x2a0a1e:nb_colors=4:speed=0.003,"
           "scale=640:360,format=gbrp[bg]")
     out = ("[bg][scope]blend=all_mode=screen:shortest=1,format=yuv420p,scale=1280:720:flags=bicubic,"
-           f"drawtext=fontfile={f}:text='Meditation Room  -  VM test stream':x=40:y=34:fontsize=26:fontcolor=white@0.7,"
+           f"drawtext=fontfile={f}:textfile='{t('title.txt')}':reload=25:x=40:y=34:fontsize=26:fontcolor=white@0.7,"
            f"drawtext=fontfile={f}:text='%{{localtime\\:%T}}':x=w-tw-40:y=34:fontsize=26:fontcolor=white@0.7,"
            f"drawtext=fontfile={f}:textfile='{t('now.txt')}':reload=25:x=40:y=h-60:fontsize=24:fontcolor=white@0.6,"
            # the ONE text block (a countdown or a teaching card, max 5 words): fades in, holds, fades out, drifts up a little
@@ -144,8 +146,21 @@ def preshow_left():
         return None
 
 
-def countdown_line(left):
-    return f"Live stream in {int((left + 59) // 60)} minutes" if left > 90 else "Live stream begins soon"
+def preshow_hhmm():
+    try:
+        return open(CACHE + "/preshow").read().strip()
+    except OSError:
+        return ""
+
+
+def countdown_line(left, n=0):
+    """Max 5 words. Alternates "Concert live at 12:00" and "Concert in N minutes"."""
+    if left <= 90:
+        return "Concert begins in a moment"
+    if n % 2 == 0:
+        return f"Concert live at {preshow_hhmm()}"
+    mins = int((left + 59) // 60)
+    return f"Concert in {mins} minutes" if mins > 1 else "Concert in one minute"
 
 
 def five_words(c):
@@ -178,7 +193,7 @@ def card_loop(stop):
             line = ""
             left = preshow_left()
             if left is not None and cycle % 2 == 0:
-                line = countdown_line(left)          # even cycles: the countdown, odd cycles: a card
+                line = countdown_line(left, cycle // 2)   # even cycles: the countdown, odd cycles: a card
             elif left is not None:
                 try:
                     cards = json.load(open(CARDS)).get("cards", [])
@@ -201,6 +216,8 @@ def wrap(text, width):
 def run():
     os.makedirs(CACHE, exist_ok=True)
     wfile(f"{CACHE}/block.txt", "")
+    if not os.path.exists(f"{CACHE}/title.txt"):
+        wfile(f"{CACHE}/title.txt", "Meditation Room")
     for n in ("text.txt", "now.txt"):
         if not os.path.exists(f"{CACHE}/{n}"):
             wfile(f"{CACHE}/{n}", "")
@@ -292,7 +309,7 @@ def checks():
     """Every reason not to go live, as a list of sentences (empty = free)."""
     why = []
     if in_noon():
-        why.append("it is between 11:50 and 13:50 Zagreb time (the noon replay owns the site)")
+        why.append(f"it is between {NOON[0]:%H:%M} and {NOON[1]:%H:%M} Zagreb time (the noon replay owns the site)")
     try:
         if site_public().get("live"):
             why.append("the site is already live (another camera or the cloud mixer)")
@@ -312,7 +329,18 @@ def checks():
     return why
 
 
-def live(minutes):
+def end_time(arg):
+    """'HH:MM' (Zagreb, today) or minutes -> a monotonic deadline; never more than 2 hours."""
+    if ":" in str(arg):
+        h, m = map(int, str(arg).split(":"))
+        now = dt.datetime.now(ZAGREB)
+        secs = (now.replace(hour=h, minute=m, second=0, microsecond=0) - now).total_seconds()
+    else:
+        secs = float(arg) * 60
+    return time.monotonic() + max(0.0, min(secs, 7200.0))
+
+
+def live(arg):
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
@@ -337,10 +365,10 @@ def live(minutes):
         if fwd.poll() is None and not stop.is_set():
             print("[mrlinux] public path ready, site GO: " + json.dumps(site("go")), flush=True)
             went = True
-        end = time.monotonic() + minutes * 60
+        end = end_time(arg)
         while not stop.is_set() and fwd.poll() is None and time.monotonic() < end:
             if in_noon():
-                print("[mrlinux] noon window reached: stopping", flush=True)
+                print(f"[mrlinux] {NOON[0]:%H:%M} reached (the noon replay takes over): stopping", flush=True)
                 break
             stop.wait(5)
     finally:
@@ -372,7 +400,7 @@ if __name__ == "__main__":
     if cmd == "run":
         run()
     elif cmd == "live":
-        live(float(sys.argv[2]) if len(sys.argv) > 2 else 5)
+        live(sys.argv[2] if len(sys.argv) > 2 else "5")
     elif cmd == "checks":
         w = checks()
         print("free to go live" if not w else "NOT free: " + "; ".join(w))

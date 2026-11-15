@@ -9,5 +9,5 @@ EnvironmentFile=-/run/mrlinux-live.env
 ExecStart=/usr/bin/python3 /usr/local/lib/meditation-room-linux/meditation_room_linux.py live ${MRL_MINUTES}
 ExecStopPost=/usr/bin/python3 /usr/local/lib/meditation-room-linux/meditation_room_linux.py site-stop-if-ours
 Restart=no
-RuntimeMaxSec=1800
+RuntimeMaxSec=7500
 TimeoutStopSec=30

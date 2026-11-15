@@ -3,10 +3,11 @@
 #   mrlinux start [--preshow-until HH:MM]   private test relay + encoder (nothing public)
 #   mrlinux stop                            stops live (if any), encoder and test relay
 #   mrlinux status                          services, encoder numbers (speed ~1.0x), test relay path, site state
-#   mrlinux go-live [minutes]               (default 5, max 30) public relay path santoshi + site GO as camera "VM Test";
+#   mrlinux go-live [min | --until HH:MM]   (default 5 min, max 2 h, never past 11:56 before the noon replay) public relay path santoshi + site GO as camera "VM Test";
 #                                           refused 11:50-13:50 Zagreb, while the site is live, or while santoshi has a publisher
 #   mrlinux stop-live                       site STOP, public copy ends; the test stream keeps running
 #   mrlinux text "words" | text --clear     words over the picture (line breaks: \n)
+#   mrlinux title "words"                   the small title top left (default "Meditation Room")
 #   mrlinux preshow HH:MM | preshow --off   countdown "Live stream in N minutes" and a card (one block, max 5 words, every 120 s)
 #   mrlinux checks                          would go-live be allowed now?
 set -e
@@ -24,19 +25,25 @@ case "${1:-status}" in
     sudo systemctl stop meditation-room-linux mrlinux-relay
     echo "stopped";;
   go-live)
-    m=${2:-5}; case "$m" in ''|*[!0-9]*) echo "minutes must be a whole number"; exit 2;; esac
-    [ "$m" -gt 30 ] && m=30
+    if [ "$2" = "--until" ]; then
+      m=$3; case "$m" in [0-2][0-9]:[0-5][0-9]) ;; *) echo "--until needs HH:MM (Zagreb time, max 2 h ahead)"; exit 2;; esac
+    else
+      m=${2:-5}; case "$m" in ''|*[!0-9]*) echo "minutes must be a whole number (or --until HH:MM)"; exit 2;; esac
+      [ "$m" -gt 120 ] && m=120
+    fi
     out=$(sudo python3 $LIB/meditation_room_linux.py checks)
     case "$out" in "free to go live") ;; *) echo "$out"; exit 3;; esac
     echo "MRL_MINUTES=$m" | sudo tee /run/mrlinux-live.env >/dev/null
     sudo systemctl start mrlinux-live
-    echo "going live for $m min (stop: mrlinux stop-live); log: journalctl -u mrlinux-live -f";;
+    echo "going live, ends at $m (min or HH:MM; stops by itself at 11:56 at the latest) (stop: mrlinux stop-live); log: journalctl -u mrlinux-live -f";;
   stop-live)
     sudo systemctl stop mrlinux-live; echo "live stopped";;
   checks)
     sudo python3 $LIB/meditation_room_linux.py checks;;
   text)
     if [ "$2" = "--clear" ] || [ -z "$2" ]; then put text.txt ""; echo "text cleared"; else put text.txt "$2"; echo "text set"; fi;;
+  title)
+    put title.txt "${2:-Meditation Room}"; echo "title set";;
   preshow)
     if [ "$2" = "--off" ] || [ -z "$2" ]; then rm -f "$C/preshow"; echo "pre-show countdown off"; else echo "$2" > "$C/preshow"; echo "countdown to $2 (Zagreb)"; fi;;
   status)
