@@ -1,0 +1,51 @@
+#!/bin/bash
+# mrlinux: the Meditation Room (Linux) test stream on chromium-vm (MANTRA_ROOM/linux, Marko 15.11.2026).
+#   mrlinux start [--preshow-until HH:MM]   private test relay + encoder (nothing public)
+#   mrlinux stop                            stops live (if any), encoder and test relay
+#   mrlinux status                          services, encoder numbers (speed ~1.0x), test relay path, site state
+#   mrlinux go-live [minutes]               (default 5, max 30) public relay path santoshi + site GO as camera "VM Test";
+#                                           refused 11:50-13:50 Zagreb, while the site is live, or while santoshi has a publisher
+#   mrlinux stop-live                       site STOP, public copy ends; the test stream keeps running
+#   mrlinux text "words" | text --clear     words over the picture (line breaks: \n)
+#   mrlinux preshow HH:MM | preshow --off   countdown "N minutes until the live stream"
+#   mrlinux checks                          would go-live be allowed now?
+set -e
+LIB=/usr/local/lib/meditation-room-linux
+C=/home/ubuntu/.cache/mrlinux
+mkdir -p "$C"
+put() { printf '%b' "$2" > "$C/$1.tmp" && mv "$C/$1.tmp" "$C/$1"; }
+case "${1:-status}" in
+  start)
+    if [ "$2" = "--preshow-until" ] && [ -n "$3" ]; then echo "$3" > "$C/preshow"; fi
+    sudo systemctl start mrlinux-relay meditation-room-linux
+    echo "started: test stream -> private relay vmtest (HLS http://100.102.86.30:8987/vmtest/index.m3u8, Tailscale only)";;
+  stop)
+    sudo systemctl stop mrlinux-live 2>/dev/null || true
+    sudo systemctl stop meditation-room-linux mrlinux-relay
+    echo "stopped";;
+  go-live)
+    m=${2:-5}; case "$m" in ''|*[!0-9]*) echo "minutes must be a whole number"; exit 2;; esac
+    [ "$m" -gt 30 ] && m=30
+    out=$(sudo python3 $LIB/meditation_room_linux.py checks)
+    case "$out" in "free to go live") ;; *) echo "$out"; exit 3;; esac
+    echo "MRL_MINUTES=$m" | sudo tee /run/mrlinux-live.env >/dev/null
+    sudo systemctl start mrlinux-live
+    echo "going live for $m min (stop: mrlinux stop-live); log: journalctl -u mrlinux-live -f";;
+  stop-live)
+    sudo systemctl stop mrlinux-live; echo "live stopped";;
+  checks)
+    sudo python3 $LIB/meditation_room_linux.py checks;;
+  text)
+    if [ "$2" = "--clear" ] || [ -z "$2" ]; then put text.txt " "; echo "text cleared"; else put text.txt "$2"; echo "text set"; fi;;
+  preshow)
+    if [ "$2" = "--off" ] || [ -z "$2" ]; then rm -f "$C/preshow"; echo "pre-show countdown off"; else echo "$2" > "$C/preshow"; echo "countdown to $2 (Zagreb)"; fi;;
+  status)
+    for u in mrlinux-relay meditation-room-linux mrlinux-live; do printf '%-24s %s\n' "$u" "$(systemctl is-active $u)"; done
+    [ -f "$C/status.json" ] && cat "$C/status.json" && echo
+    printf 'test relay path vmtest: '; curl -s --max-time 5 http://127.0.0.1:9996/v3/paths/get/vmtest | python3 -c 'import sys,json
+try:
+ d=json.load(sys.stdin); print("ready" if d.get("ready") else "no stream", "| readers", len(d.get("readers") or []), "| in", round((d.get("bytesReceived") or 0)/1e6,1), "MB")
+except Exception: print("relay down")'
+    printf 'site: '; curl -s --max-time 10 https://santoshi-band.pages.dev/api/live | python3 -c 'import sys,json; d=json.load(sys.stdin); print("LIVE via", d.get("via")) if d.get("live") else print("not live")';;
+  *) sed -n 2,12p "$0"; exit 2;;
+esac
