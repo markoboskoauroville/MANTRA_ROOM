@@ -36,7 +36,7 @@ case "${1:-status}" in
   checks)
     sudo python3 $LIB/meditation_room_linux.py checks;;
   text)
-    if [ "$2" = "--clear" ] || [ -z "$2" ]; then put text.txt " "; echo "text cleared"; else put text.txt "$2"; echo "text set"; fi;;
+    if [ "$2" = "--clear" ] || [ -z "$2" ]; then put text.txt ""; echo "text cleared"; else put text.txt "$2"; echo "text set"; fi;;
   preshow)
     if [ "$2" = "--off" ] || [ -z "$2" ]; then rm -f "$C/preshow"; echo "pre-show countdown off"; else echo "$2" > "$C/preshow"; echo "countdown to $2 (Zagreb)"; fi;;
   status)

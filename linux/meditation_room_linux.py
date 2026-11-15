@@ -55,7 +55,7 @@ def wfile(path, text):
     """Atomic write (drawtext re-reads these files while we change them)."""
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
-        f.write(text if text.strip() else " ")
+        f.write(text if text.strip() else "")  # empty = nothing drawn (a space would draw an empty box)
     os.replace(tmp, path)
 
 
