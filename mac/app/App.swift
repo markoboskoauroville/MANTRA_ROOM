@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 import WebKit
 
-let VERSION = 16
+let VERSION = 17
 let APP_NAME = "Meditation Room (Mantra)"
 
 enum Ink {

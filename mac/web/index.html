@@ -76,7 +76,7 @@ const HEX = []; for(let i=0;i<256;i++) HEX.push((i<16?"0":"")+i.toString(16));
 // forces the visible web view to re-render (WKWebView.takeSnapshot did, and made the window flicker).
 const g3 = document.createElement("canvas"); g3.width = 1280; g3.height = 720;
 const x3 = g3.getContext("2d");
-let ndiOn = false, lastCap = 0, lastJpeg = "", jpegSeq = 0, sentSeq = 0;
+let ndiPoll = -1e9, lastCap = 0, lastJpeg = "", jpegSeq = 0, sentSeq = 0;
 function grabNdi(){
   const now = performance.now();
   if(now - lastCap < 38) return;
@@ -88,8 +88,9 @@ function grabNdi(){
   jpegSeq++;
 }
 window.room = {
-  ndi(on){ ndiOn = !!on; },
-  jpeg(){ if(sentSeq === jpegSeq) return ""; sentSeq = jpegSeq; return lastJpeg; },
+  ndi(on){ },
+  // asking is what switches the grab on (and 2 s without asking switches it off): no start-up order to get wrong
+  jpeg(){ ndiPoll = performance.now(); if(sentSeq === jpegSeq) return ""; sentSeq = jpegSeq; return lastJpeg; },
   // l, r: base64 of 1024 unsigned bytes (128 = silence); gw, gh: the size of the frame wanted back, 0 = none
   tick(l, r, gw, gh){
     if(!viz) return "";
@@ -98,7 +99,7 @@ window.room = {
     if(auto && performance.now() - lastChange > 40000) load(ix + 1, 6);   // Auto, as on the phone: every 40 s, 6 s blend
     viz.render({audioLevels:{timeByteArray:M, timeByteArrayL:L, timeByteArrayR:R}});
     frames++;
-    if(ndiOn) grabNdi();
+    if(performance.now() - ndiPoll < 2000) grabNdi();
     if(!gw || !gh) return "";
     // two steps (4x, then the size asked) so the small picture is an average, not a few sampled pixels
     if(g1.width !== gw*4 || g1.height !== gh*4){ g1.width = gw*4; g1.height = gh*4; }

@@ -74,3 +74,4 @@
 - Escape text in the filter graph through files (textfile), not `text='...'`: the quoting ate a letter of "stream".
 - A private MediaMTX next to the public relay: switch `moq: false`, or it opens :8892/:8893 on every interface.
 - MediaMTX HLS answers the first request with 302 ?cookieCheck=1: `curl -L`.
+- NDI proof = content, not count: look at a received frame and check the mean changes frame to frame (the frame-count test passed on a black picture for five versions).

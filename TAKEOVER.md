@@ -309,3 +309,4 @@ clone of this public repo: audio, linux, preshow; nothing from the Mac). Units a
   camera token like /admin > PAIR CAMERA makes: either KV `camtoken:<sha256>` = {name:"VM Test",created,hash}, or
   Marko presses PAIR CAMERA "VM Test" and the shown token replaces the file's content.
 - Commands: `mrlinux start|stop|status|go-live [min]|stop-live|text "..."|text --clear|preshow HH:MM|preshow --off|checks`.
+- **Mac v17**: the NDI picture was BLACK in v12-v16 when --ndi came at launch (room.ndi(true) ran before the page existed; ndiOn stayed false, and the receiver tests only counted frames). Now room.jpeg() itself arms the grab. Lesson: a receiver test must check the picture content (mean per frame changes), not only the frame count.
