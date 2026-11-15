@@ -203,3 +203,7 @@ Reading (master): both exist as the two styles of each element (Earth, Water, Fi
 > please add an icon for immersive view full screen. Clicking does change the visualization. Escape is bringing you out of this immersive view
 
 Reading (master): an icon in the title row (AX button "Immersive view") puts the window into native full screen on its own display with the picture alone (controls and title row hidden, cursor hides after 2 s); a click = next visualization; Esc restores the window as it was; sound and lights go on. Mac v6.
+
+## Request 41 (15.11.2026): private aggregate devices must not be listed
+
+Reading (master): "CADefaultDeviceAggregate-..." is a private aggregate the system makes for our own process; it must not appear in OUTPUTS. Filtered by name and by aggregate transport type. Mac v7.

@@ -51,6 +51,13 @@ enum Devices {
         let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
         return list.reduce(0) { $0 + Int($1.mNumberChannels) }
     }
+    /// the system's own private aggregates (made for a process) are not outputs to choose
+    static func isPrivateAggregate(_ id: AudioDeviceID) -> Bool {
+        var a = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyTransportType, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var t: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &a, 0, nil, &size, &t) == noErr, t == kAudioDeviceTransportTypeAggregate else { return false }
+        return string(id, kAudioDevicePropertyDeviceUID).hasPrefix("CADefaultDeviceAggregate") || string(id, kAudioObjectPropertyName).isEmpty
+    }
     /// every device that can play sound, in the order CoreAudio gives them
     static func outputs() -> [OutDev] {
         var a = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
@@ -59,7 +66,7 @@ enum Devices {
         guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &a, 0, nil, &size) == noErr else { return [] }
         var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &a, 0, nil, &size, &ids) == noErr else { return [] }
-        return ids.filter { outputChannels($0) > 0 }
+        return ids.filter { outputChannels($0) > 0 && !string($0, kAudioObjectPropertyName).hasPrefix("CADefaultDeviceAggregate") && !isPrivateAggregate($0) }
             .map { OutDev(id: $0, name: string($0, kAudioObjectPropertyName), uid: string($0, kAudioDevicePropertyDeviceUID)) }
     }
     static func defaultOutput() -> OutDev? {
